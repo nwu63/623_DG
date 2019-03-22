@@ -1,4 +1,4 @@
-from fortran import dg, getjacobian,basis2d,getrefmassmatrix
+from fortran import dg, getjacobian,basis2d,getrefmassmatrix,roeflux,eulerflux
 import numpy as np
 
 from fileIO import readMesh, readMeshMatrices, writeSolution, readSolution
@@ -13,7 +13,16 @@ def initSolution(restart=False,filename=None):
         qIC = getIC()
         q = np.tile(qIC,(nelem,1))
     return q
-
+def testFlux():
+    qIC = getIC()
+    np.random.seed(0)
+    qL = qIC
+    qR = qIC * (np.random.rand()*0.1+1)
+    nrm = np.array([1,0])
+    nrm = nrm/np.linalg.norm(nrm)
+    print(roeflux(qL,qL,nrm,GAMMA)[0] - eulerflux(qL,nrm,GAMMA)[0])
+    print(roeflux(qL,qR,nrm,GAMMA)[0] + roeflux(qR,qL,-nrm,GAMMA)[0])
+    print(roeflux(qL,qR,nrm,GAMMA)[0] - eulerflux(qL,nrm,GAMMA)[0])
 
 def unittests():
     Mref = getmassmatrix(0)
@@ -50,3 +59,4 @@ if __name__ == '__main__':
 
     # q,resids,maxres = dg(q,p,node,E2N,I2E,B2E,In,Bn,rBC,GAMMA,GAS_CONSTANT,CFL,convtol,miniter,maxiter,nnode,nelem,niface,nbface)
     Mref = getrefmassmatrix(0)
+    testFlux()
