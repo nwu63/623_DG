@@ -15,9 +15,7 @@ subroutine getRefMassMatrix(p,M)
     allocate(wmat(Ng,Ng))
     call Gauss2D(2*p,Ng,xy,w)
     wmat = 0 
-    FORALL(i=1:size(wmat,1)) wmat(i,i) = w(i) 
-
+    FORALL(i=1:size(wmat,1)) wmat(i,i) = w(i) ! wmat = diag(w)
     call basis2D(xy, p, phi, Ng)
-
     M = matmul(matmul(transpose(phi),wmat),phi)
 end subroutine getRefMassMatrix

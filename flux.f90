@@ -1,4 +1,4 @@
-subroutine eulerFlux(q,F,nrm,gamma,smax)
+subroutine eulerFlux(q,F,vec,gamma,smax)
     ! -----------------------------------------------------------------------
     ! Purpose: Calculates the analytical Euler flux given a state and normal
     ! 
@@ -13,7 +13,7 @@ subroutine eulerFlux(q,F,nrm,gamma,smax)
     ! -----------------------------------------------------------------------
     implicit none
     real(8), intent(in), dimension(0:3) :: q
-    real(8), intent(in), dimension(0:1) :: nrm
+    real(8), intent(in), dimension(0:1) :: vec
     real(8), intent(in) :: gamma
     real(8), intent(out), dimension(0:3) :: F
     real(8), intent(out) :: smax
@@ -22,6 +22,8 @@ subroutine eulerFlux(q,F,nrm,gamma,smax)
     real(8) :: velnorm,p,H,unorm,c
     real(8), dimension(0:3) :: F1, F2
     real(8), dimension(0:2) :: lambda
+    real(8), dimension(0:1) :: nrm
+    nrm = vec / norm2(vec) ! we always normalize nrm
     unorm = q(1)/q(0)*nrm(0) + q(2)/q(0)*nrm(1)
     velnorm = sqrt((q(1)/q(0))**2 + (q(2)/q(0))**2) ! this is the norm of velocity vector
     p = (gamma-1)*(q(3) - 0.5d0*q(0)*velnorm**2)
@@ -43,7 +45,9 @@ subroutine eulerFlux(q,F,nrm,gamma,smax)
     F2(3) = q(2)*H
 
     F = F1(:)*nrm(0) + F2(:)*nrm(1) ! Here we project it to the normal direction
-
+    if (norm2(vec) == 0.d0) then
+        F = 0.d0
+    endif
 end subroutine eulerFlux
 
 
@@ -81,11 +85,10 @@ subroutine roeAvgState(qL,qR,qA,gamma)
     qA(0) = (rL*qL(1)/qL(0) + rR*qR(1)/qR(0))/(rL + rR)
     qA(1) = (rL*qL(2)/qL(0) + rR*qR(2)/qR(0))/(rL + rR)
     qA(2) = (rL*HL + rR*HR)/(rL + rR)
-
 end subroutine roeAvgState
 
 
-subroutine roeFlux(qL,qR,F,nrm,gamma,smax)
+subroutine roeFlux(qL,qR,F,vec,gamma,smax)
     ! -----------------------------------------------------------------------
     ! Purpose: computes the Roe flux given left/right states and the normal
     ! 
@@ -101,7 +104,7 @@ subroutine roeFlux(qL,qR,F,nrm,gamma,smax)
     ! -----------------------------------------------------------------------
     implicit none
     real(8), intent(in), dimension(0:3) :: qL, qR
-    real(8), intent(in), dimension(0:1) :: nrm
+    real(8), intent(in), dimension(0:1) :: vec
     real(8), intent(in) :: gamma
     real(8), intent(out), dimension(0:3) :: F
     real(8), intent(out) :: smax
@@ -110,8 +113,10 @@ subroutine roeFlux(qL,qR,F,nrm,gamma,smax)
     real(8), dimension(0:3) :: FL, FR, dq, R
     real(8), dimension(0:2) :: qA, lambda
     real(8) :: unorm, velnorm, H, c, M, G1, G2, s1, s2, C1, C2, epsilon
+    real(8), dimension(0:1) :: nrm
     ! _____________________
     ! begin main execution 
+    nrm = vec/norm2(vec) ! always normalize
     call eulerFlux(qL,FL,nrm,gamma,smax) ! these smax values are overwritten later on
     call eulerFlux(qR,FR,nrm,gamma,smax)
 

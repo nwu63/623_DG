@@ -5,13 +5,13 @@ from fileIO import readMesh, readMeshMatrices, writeSolution, readSolution
 from processMesh import signedArea, computeCentroidVec
 from constants import GAS_CONSTANT, GAMMA, getIC, getBC
 
-def initSolution(restart=False,filename=None):
+def initSolution(p,restart=False,filename=None):
     if restart != 0:
         d = readSolution(filename)
         q = d['q']
     else:
         qIC = getIC()
-        q = np.tile(qIC,(nelem,1))
+        q = np.tile(qIC,(nelem,int((p+1)*(p+2)/2),1))
     return q
 def testFlux():
     qIC = getIC()
@@ -33,7 +33,7 @@ def unittests():
 
 if __name__ == '__main__':
     meshFile = 'bump0'
-    p = 2
+    p = 1
     # saveFile = '../solution_0/'+meshFile+'_'+str(order)+'_sol'
     # restartFile = '../solution_0/'+meshFile+'_1_sol'
     # restartFile = saveFile
@@ -51,12 +51,17 @@ if __name__ == '__main__':
     nbface = B2E.shape[0]
 
     rBC = getBC()
-    q = initSolution(restart=restart)
+    q = initSolution(p,restart=restart)
     CFL = 1.0
     convtol = 1e-7
     miniter = 1e5
     maxiter = 1e5
 
-    # q,resids,maxres = dg(q,p,node,E2N,I2E,B2E,In,Bn,rBC,GAMMA,GAS_CONSTANT,CFL,convtol,miniter,maxiter,nnode,nelem,niface,nbface)
-    Mref = getrefmassmatrix(0)
-    testFlux()
+    q,resids,maxres = dg(q,p,node,E2N,I2E,B2E,In,Bn,rBC,GAMMA,GAS_CONSTANT,CFL,convtol,miniter,maxiter,nnode,nelem,niface,nbface)
+    print(np.squeeze(resids))
+    print(np.max(resids))
+    # Mref = getrefmassmatrix(0)
+    # for ielem in range(nelem):
+    #     _,_,J = getjacobian(node[E2N[ielem,:]-1,:])
+    #     M = Mref * J
+    #     print(np.sum(M)/area[ielem] - 1)

@@ -1,6 +1,6 @@
 subroutine Gauss1D(p,x,w)
     integer, intent(in) :: p ! p is integration order! not solution order
-    real(8), intent(out), dimension((p+2)/2) :: x,w
+    real(8), intent(out), dimension((p+2)/2) :: x,w ! integer division to apply floor, since it's really floor((p+1)/2)
 
     if (p == 1) then
         ! Order 1 Gauss-Legendre points
@@ -285,11 +285,13 @@ subroutine Gauss2D_pre(p,N)
 end subroutine Gauss2D_pre
 
 
-subroutine Gauss2D(p,N,x,w)
+subroutine Gauss2D(p,N,xy,w)
     integer, intent(in) :: p
     integer, intent(in) :: N
-    real(8), intent(out), dimension(2*N) :: x
+    real(8), intent(out), dimension(N,2) :: xy
     real(8), intent(out), dimension(N) :: w
+
+    real(8), dimension(2*N) :: x
     
     if (p == 1) then
         ! Order 1 Dunavant Points
@@ -658,4 +660,6 @@ subroutine Gauss2D(p,N,x,w)
         0.001899964427651 &
         /)
     endif
+
+    xy = reshape(x,(/N,2/),order=(/1,2/))
 end subroutine Gauss2D
