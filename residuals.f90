@@ -66,30 +66,33 @@ subroutine getResidual(q,p,I2E,B2E,In,Bn,rBC,resids,Jinv,detJ,wavespeed,gamma,Rg
     call Gauss1D(2*p+1,x,w1)
     allocate(qL(Ng1,4))
     allocate(qR(Ng1,4))
-    ! now we map these 1D quadrature points to T, one for each edge
-    xy1(1,:,1) = -x
+    ! now we map these 1D quadrature points to T, one for each edge in ccw order
+    xy1(1,:,1) = x(Ng1:1:-1)
     xy1(1,:,2) = x
     xy1(2,:,1) = 0
-    xy1(2,:,2) = -x
+    xy1(2,:,2) = x(Ng1:1:-1)
     xy1(3,:,1) = x
     xy1(3,:,2) = 0
     call basis2D(xy1(1,:,:), p, phi1(1,:,:), Ng1)
     call basis2D(xy1(2,:,:), p, phi1(2,:,:), Ng1)
     call basis2D(xy1(3,:,:), p, phi1(3,:,:), Ng1)
+    ! print*, x
+    ! print*, phi1(1,:,:)
+    ! print*, phi1(2,:,:)
+    ! print*, phi1(3,:,:)
 
     ! ------------------- interior element contribution
     do elem = 1,nelem
         call getQ(q(elem,:,:),p,xy,Ng,qState)
         do ig = 1,Ng
             vec = matmul(gphi(ig,:,:),Jinv(elem,:,:))
-            print*, gphi(ig,:,:)
             do ib = 1,Nb
                 call eulerFlux(qState(ig,:),F,vec(ib,:),gamma,smax) ! we actually only need to get F as 4x2 once, then dot
                 resids(elem,ib,:) = resids(elem,ib,:) - norm2(vec(ib,:))*F(:)*detJ(elem)*w2(ig)
             enddo
         enddo
     enddo
-    ! print*, resids
+
     ! ------------------- interior edge flux contribution
     do iface = 1, niface
         nrm = In(iface,1:2)
@@ -99,18 +102,19 @@ subroutine getResidual(q,p,I2E,B2E,In,Bn,rBC,resids,Jinv,detJ,wavespeed,gamma,Rg
         elemR = I2E(iface,3)
         faceR = I2E(iface,4)
         call getQ(q(elemL,:,:),p,xy1(faceL,:,:),Ng1,qL)
-        call getQ(q(elemR,:,:),p,xy1(faceR,Ng1:1:-1,Ng1:1:-1),Ng1,qR) ! need to reverse the integration order for the other side
+        call getQ(q(elemR,:,:),p,xy1(faceR,:,:),Ng1,qR) ! need to reverse the integration order for the other side
         do ig = 1,Ng1
-            call roeFlux(qL(ig,:),qR(ig,:),F,nrm,gamma,smax)
+            call roeFlux(qL(ig,:),qR(Ng1-ig+1,:),F,nrm,gamma,smax)
+            ! print*, F
             do ib = 1,Nb
                 resids(elemL,ib,:) = resids(elemL,ib,:) + phi1(faceL,ig,ib)*F(:)*length*w1(ig)
-                resids(elemR,ib,:) = resids(elemR,ib,:) - phi1(faceR,ig,ib)*F(:)*length*w1(Ng1-ig+1) ! apply weights in reverse
+                resids(elemR,ib,:) = resids(elemR,ib,:) - phi1(faceR,Ng1-ig+1,ib)*F(:)*length*w1(Ng1-ig+1) ! apply weights in reverse
             enddo
         enddo
         wavespeed(elemL) = wavespeed(elemL) + smax*length
         wavespeed(elemR) = wavespeed(elemR) + smax*length
     enddo
-
+    
     ! -------------------- unpack rBC
     pinf = rBC(1)
     rhoinf = rBC(2)
@@ -190,6 +194,7 @@ subroutine getResidual(q,p,I2E,B2E,In,Bn,rBC,resids,Jinv,detJ,wavespeed,gamma,Rg
         enddo
         wavespeed(elem) = wavespeed(elem) + smax*length
     enddo
+    ! print*, resids(:,3,:)
 end subroutine getResidual
 
 subroutine getQ(q,p,xy,n_xy,qState)

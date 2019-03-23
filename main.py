@@ -32,7 +32,7 @@ def unittests():
         print(np.sum(M)/area[ielem] - 1)
 
 if __name__ == '__main__':
-    meshFile = 'bump0'
+    meshFile = 'test'
     p = 1
     # saveFile = '../solution_0/'+meshFile+'_'+str(order)+'_sol'
     # restartFile = '../solution_0/'+meshFile+'_1_sol'
@@ -58,7 +58,7 @@ if __name__ == '__main__':
     maxiter = 1e5
 
     q,resids,maxres = dg(q,p,node,E2N,I2E,B2E,In,Bn,rBC,GAMMA,GAS_CONSTANT,CFL,convtol,miniter,maxiter,nnode,nelem,niface,nbface)
-    print(np.squeeze(resids))
+    # print(np.squeeze(resids))
     print(np.max(resids))
     # Mref = getrefmassmatrix(0)
     # for ielem in range(nelem):
