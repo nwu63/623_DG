@@ -94,20 +94,21 @@ subroutine basis2D(xy, p, phi, n_xy)
     integer, intent(in) :: n_xy, p
     real(8), intent(in), dimension(n_xy,2) :: xy
     real(8), intent(out), dimension(n_xy,(p+1)*(p+2)/2) :: phi
-!f2py intent(in) xn,x
+!f2py intent(in) xy
 !f2py intent(out) phi
     integer :: s, r, k, j, i_xy
     real(8), dimension((p+1)*(p+2)/2,(p+1)*(p+2)/2) :: C
     
     call triLagrange2D(p,C)
-    j = 1
-    do s = 0, p
-        do r = 0, p-s
-            call fullOrder(r,s,p,k)
-            do i_xy = 1,n_xy
-                phi(i_xy,j) = C(k,j) * xy(i_xy,1)**r * xy(i_xy,2)**s
+    phi(:,:) = 0.d0
+    do j = 1,(p+1)*(p+2)/2
+        do s = 0, p
+            do r = 0, p-s
+                call fullOrder(r,s,p,k)
+                do i_xy = 1,n_xy
+                    phi(i_xy,j) = phi(i_xy,j) + C(k,j) * xy(i_xy,1)**r * xy(i_xy,2)**s
+                enddo
             enddo
-            j = j + 1
         enddo
     enddo
 end subroutine basis2D
@@ -117,21 +118,22 @@ subroutine gbasis2D(xy, p, gphi, n_xy)
     integer, intent(in) :: n_xy, p
     real(8), intent(in), dimension(n_xy,2) :: xy
     real(8), intent(out), dimension(n_xy,(p+1)*(p+2)/2,2) :: gphi
-!f2py intent(in) xn,x
+!f2py intent(in) xy
 !f2py intent(out) gphi
     integer :: s, r, k, j, i_xy
     real(8), dimension((p+1)*(p+2)/2,(p+1)*(p+2)/2) :: C
     
     call triLagrange2D(p,C)
-    j = 1
-    do s = 0, p
-        do r = 0, p-s
-            call fullOrder(r,s,p,k)
-            do i_xy = 1,n_xy
-                gphi(i_xy,j,1) = r * C(k,j) * xy(i_xy,1)**(r-1) * xy(i_xy,2)**s
-                gphi(i_xy,j,2) = s * C(k,j) * xy(i_xy,1)**r * xy(i_xy,2)**(s-1)
+    gphi(:,:,:) = 0.d0
+    do j = 1, (p+1)*(p+2)/2
+        do s = 0, p
+            do r = 0, p-s
+                call fullOrder(r,s,p,k)
+                do i_xy = 1,n_xy
+                    gphi(i_xy,j,1) = gphi(i_xy,j,1) + r * C(k,j) * xy(i_xy,1)**(r-1) * xy(i_xy,2)**s
+                    gphi(i_xy,j,2) = gphi(i_xy,j,2) + s * C(k,j) * xy(i_xy,1)**r * xy(i_xy,2)**(s-1)
+                enddo
             enddo
-            j = j + 1
         enddo
     enddo
 end subroutine gbasis2D

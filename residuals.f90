@@ -82,14 +82,14 @@ subroutine getResidual(q,p,I2E,B2E,In,Bn,rBC,resids,Jinv,detJ,wavespeed,gamma,Rg
         call getQ(q(elem,:,:),p,xy,Ng,qState)
         do ig = 1,Ng
             vec = matmul(gphi(ig,:,:),Jinv(elem,:,:))
-            ! print*, gphi(ig,:,:)
+            print*, gphi(ig,:,:)
             do ib = 1,Nb
                 call eulerFlux(qState(ig,:),F,vec(ib,:),gamma,smax) ! we actually only need to get F as 4x2 once, then dot
                 resids(elem,ib,:) = resids(elem,ib,:) - norm2(vec(ib,:))*F(:)*detJ(elem)*w2(ig)
             enddo
         enddo
     enddo
-    
+    ! print*, resids
     ! ------------------- interior edge flux contribution
     do iface = 1, niface
         nrm = In(iface,1:2)
@@ -104,7 +104,7 @@ subroutine getResidual(q,p,I2E,B2E,In,Bn,rBC,resids,Jinv,detJ,wavespeed,gamma,Rg
             call roeFlux(qL(ig,:),qR(ig,:),F,nrm,gamma,smax)
             do ib = 1,Nb
                 resids(elemL,ib,:) = resids(elemL,ib,:) + phi1(faceL,ig,ib)*F(:)*length*w1(ig)
-                resids(elemR,ib,:) = resids(elemR,ib,:) - phi1(faceR,ig,ib)*F(:)*length*w1(Ng-ig+1) ! apply weights in reverse
+                resids(elemR,ib,:) = resids(elemR,ib,:) - phi1(faceR,ig,ib)*F(:)*length*w1(Ng1-ig+1) ! apply weights in reverse
             enddo
         enddo
         wavespeed(elemL) = wavespeed(elemL) + smax*length
