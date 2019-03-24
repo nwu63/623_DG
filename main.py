@@ -1,9 +1,11 @@
-from fortran import dg, getjacobian,basis2d,getrefmassmatrix,roeflux,eulerflux
+from fortran import dg, getjacobian,basis2d,getrefmassmatrix,roeflux,eulerflux,basis2d,gbasis2d
 import numpy as np
 
 from fileIO import readMesh, readMeshMatrices, writeSolution, readSolution
 from processMesh import signedArea, computeCentroidVec
 from constants import GAS_CONSTANT, GAMMA, getIC, getBC
+import argparse
+
 
 def initSolution(p,restart=False,filename=None):
     if restart != 0:
@@ -24,16 +26,30 @@ def testFlux():
     print(roeflux(qL,qR,nrm,GAMMA)[0] + roeflux(qR,qL,-nrm,GAMMA)[0])
     print(roeflux(qL,qR,nrm,GAMMA)[0] - eulerflux(qL,nrm,GAMMA)[0])
 
-def unittests():
+def testmat():
     Mref = getmassmatrix(0)
     for ielem in range(nelem):
         _,_,J = getjacobian(node[E2N[ielem,:]-1,:])
         M = Mref * J
         print(np.sum(M)/area[ielem] - 1)
+    
+
+
+def test_basis():
+    xy = np.random.rand(10,2)
+    p = 0
+    phi = basis2d(xy, p)
+    gphi = gbasis2d(xy, p)
+    print(np.sum(phi,axis=1))
+    print(np.sum(gphi,axis=1))
 
 if __name__ == '__main__':
-    meshFile = 'test'
-    p = 1
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--p", type=int, default=0)
+    parser.add_argument("--mesh", type=str, default='test')
+    args = parser.parse_args()
+    meshFile = args.mesh
+    p = args.p
     # saveFile = '../solution_0/'+meshFile+'_'+str(order)+'_sol'
     # restartFile = '../solution_0/'+meshFile+'_1_sol'
     # restartFile = saveFile
@@ -52,14 +68,14 @@ if __name__ == '__main__':
 
     rBC = getBC()
     q = initSolution(p,restart=restart)
-    CFL = 1.0
+    CFL = 0.001
     convtol = 1e-7
-    miniter = 1e5
+    miniter = 1e3
     maxiter = 1e5
 
     q,resids,maxres = dg(q,p,node,E2N,I2E,B2E,In,Bn,rBC,GAMMA,GAS_CONSTANT,CFL,convtol,miniter,maxiter,nnode,nelem,niface,nbface)
     # print(np.squeeze(resids))
-    print(np.max(resids))
+    # print(np.max(np.abs(resids)))
     # Mref = getrefmassmatrix(0)
     # for ielem in range(nelem):
     #     _,_,J = getjacobian(node[E2N[ielem,:]-1,:])

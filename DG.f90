@@ -19,14 +19,14 @@ subroutine DG(q,p,resids,maxres,nodes,E2N,I2E,B2E,In,Bn,rBC,gamma,Rgas,CFL,convt
     integer :: ielem, Nb
     real(8), dimension(nelem,2,2) :: J, Jinv
     real(8), dimension(nelem) :: detJ
-    real(8), dimension(:,:), allocatable :: Mref
+    real(8), dimension(:,:,:), allocatable :: Minv
     real(8), dimension(nelem) :: wavespeed
 
     ! -----------------------------------
     ! Define constants and allocate arrays
     ! -----------------------------------
     Nb = (p+1)*(p+2)/2
-    allocate(Mref(Nb,Nb))
+    allocate(Minv(nelem,Nb,Nb))
 
     ! -----------------------------------
     ! Pre-compute quantities
@@ -35,9 +35,12 @@ subroutine DG(q,p,resids,maxres,nodes,E2N,I2E,B2E,In,Bn,rBC,gamma,Rgas,CFL,convt
     do ielem = 1,nelem
         call getJacobian(nodes(E2N(ielem,:),:), J(ielem,:,:), Jinv(ielem,:,:), detJ(ielem))
     enddo
-    call getRefMassMatrix(p,Mref)
-    call getResidual(q,p,I2E,B2E,In,Bn,rBC,resids,Jinv,detJ,wavespeed,gamma,Rgas,nelem,niface,nbface)
+    call getMassInv(p,detJ,Minv,nelem)
 
 
+    call timeIntegration(q,p,I2E,B2E,In,Bn,Jinv,detJ,Minv,rBC,resids,maxres,&
+    gamma,Rgas,CFL,convtol,min_iter,max_iter,nelem,niface,nbface)
 
+
+    ! call getResidual(q,p,I2E,B2E,In,Bn,rBC,resids,Jinv,detJ,wavespeed,gamma,Rgas,nelem,niface,nbface)
 end subroutine DG

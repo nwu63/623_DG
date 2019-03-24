@@ -2,7 +2,7 @@ subroutine Gauss1D(p,x,w)
     integer, intent(in) :: p ! p is integration order! not solution order
     real(8), intent(out), dimension((p+2)/2) :: x,w ! integer division to apply floor, since it's really floor((p+1)/2)
 
-    if (p == 1) then
+    if (p <= 1) then
         ! Order 1 Gauss-Legendre points
         x = (/ &
             0.500000000000000 & 

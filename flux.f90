@@ -45,7 +45,7 @@ subroutine eulerFlux(q,F,vec,gamma,smax)
     F2(3) = q(2)*H
 
     F = F1(:)*nrm(0) + F2(:)*nrm(1) ! Here we project it to the normal direction
-    if (norm2(vec) == 0.d0) then
+    if (norm2(vec) <= 1.d-15) then
         F = 0.d0
     endif
 end subroutine eulerFlux

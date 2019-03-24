@@ -32,16 +32,16 @@ subroutine getResidual(q,p,I2E,B2E,In,Bn,rBC,resids,Jinv,detJ,wavespeed,gamma,Rg
     real(8), intent(out), dimension(nelem) :: wavespeed ! this is in fact the sum of length*wavespeed for each cell
 !f2py intent(in) q,I2E,B2E,In,Bn,rBC,gamma, Rgas, Jinv, detJ
 !f2py intent(out) resids,wavespeed
-    integer :: iface, elemL,elemR,faceL,faceR,elem,btype,face,Nb,Ng,ig,ib, Ng1
+    integer :: iface, elemL,elemR,faceL,faceR,elem,btype,face,Nb,Ng,ig,ib,g1,Ng1
     real(8), dimension(2) :: nrm
     real(8), dimension(4) :: F,qBC,qI
     real(8) :: length,pinf,Mb,rhoinf,Tt,pt,alpha,Tb,pb,cb,Splus,Jplus,uI,vI,unb,unplus,cplus,pplus,ub,vb,dn,a,b,c,det,smax
     logical :: dirichlet ! sets all BC to Dirichlet equal to qBC
-    real(8), dimension(:,:,:), allocatable :: gphi, xy1, phi1 ! xy1 is the edge integration points on T
+    real(8), dimension(:,:,:), allocatable :: gphi, xyL, phiL,xyR, phiR ! xy1 is the edge integration points on T
     real(8), dimension(:,:), allocatable :: xy, vec, qState, qL, qR
     real(8), dimension(:), allocatable :: w1,w2,x
     
-    dirichlet = .true.
+    dirichlet = .false.
     resids(:,:,:) = 0.d0 ! reset resids to zero
     wavespeed(:) = 0
     ! -----------------------------------
@@ -57,25 +57,36 @@ subroutine getResidual(q,p,I2E,B2E,In,Bn,rBC,resids,Jinv,detJ,wavespeed,gamma,Rg
     call Gauss2D(2*p+1,Ng,xy,w2)
     call gbasis2D(xy, p, gphi, Ng)
     
-
-    Ng1 = p+1
+    g1 = 2*p+1
+    Ng1 = (g1+2)/2
     allocate(x(Ng1))
     allocate(w1(Ng1))
-    allocate(xy1(3,Ng1,2))
-    allocate(phi1(3,Ng1,Nb))
-    call Gauss1D(2*p+1,x,w1)
+    allocate(xyL(3,Ng1,2))
+    allocate(phiL(3,Ng1,Nb))
+    allocate(xyR(3,Ng1,2))
+    allocate(phiR(3,Ng1,Nb))
+    call Gauss1D(g1,x,w1)
     allocate(qL(Ng1,4))
     allocate(qR(Ng1,4))
     ! now we map these 1D quadrature points to T, one for each edge in ccw order
-    xy1(1,:,1) = x(Ng1:1:-1)
-    xy1(1,:,2) = x
-    xy1(2,:,1) = 0
-    xy1(2,:,2) = x(Ng1:1:-1)
-    xy1(3,:,1) = x
-    xy1(3,:,2) = 0
-    call basis2D(xy1(1,:,:), p, phi1(1,:,:), Ng1)
-    call basis2D(xy1(2,:,:), p, phi1(2,:,:), Ng1)
-    call basis2D(xy1(3,:,:), p, phi1(3,:,:), Ng1)
+    xyL(1,:,1) = 1-x
+    xyL(1,:,2) = x
+    xyL(2,:,1) = 0
+    xyL(2,:,2) = 1-x
+    xyL(3,:,1) = x
+    xyL(3,:,2) = 0
+    call basis2D(xyL(1,:,:), p, phiL(1,:,:), Ng1)
+    call basis2D(xyL(2,:,:), p, phiL(2,:,:), Ng1)
+    call basis2D(xyL(3,:,:), p, phiL(3,:,:), Ng1)
+    xyR(1,:,1) = xyL(1,Ng1:1:-1,1) ! Now we flip them for the right element
+    xyR(1,:,2) = xyL(1,Ng1:1:-1,2)
+    xyR(2,:,1) = xyL(2,Ng1:1:-1,1)
+    xyR(2,:,2) = xyL(2,Ng1:1:-1,2)
+    xyR(3,:,1) = xyL(3,Ng1:1:-1,1)
+    xyR(3,:,2) = xyL(3,Ng1:1:-1,2)
+    call basis2D(xyR(1,:,:), p, phiR(1,:,:), Ng1)
+    call basis2D(xyR(2,:,:), p, phiR(2,:,:), Ng1)
+    call basis2D(xyR(3,:,:), p, phiR(3,:,:), Ng1)
     ! print*, x
     ! print*, phi1(1,:,:)
     ! print*, phi1(2,:,:)
@@ -101,20 +112,20 @@ subroutine getResidual(q,p,I2E,B2E,In,Bn,rBC,resids,Jinv,detJ,wavespeed,gamma,Rg
         faceL = I2E(iface,2)
         elemR = I2E(iface,3)
         faceR = I2E(iface,4)
-        call getQ(q(elemL,:,:),p,xy1(faceL,:,:),Ng1,qL)
-        call getQ(q(elemR,:,:),p,xy1(faceR,:,:),Ng1,qR) ! need to reverse the integration order for the other side
+        call getQ(q(elemL,:,:),p,xyL(faceL,:,:),Ng1,qL)
+        call getQ(q(elemR,:,:),p,xyR(faceR,:,:),Ng1,qR) ! need to reverse the integration order for the other side
         do ig = 1,Ng1
-            call roeFlux(qL(ig,:),qR(Ng1-ig+1,:),F,nrm,gamma,smax)
+            call roeFlux(qL(ig,:),qR(ig,:),F,nrm,gamma,smax)
             ! print*, F
             do ib = 1,Nb
-                resids(elemL,ib,:) = resids(elemL,ib,:) + phi1(faceL,ig,ib)*F(:)*length*w1(ig)
-                resids(elemR,ib,:) = resids(elemR,ib,:) - phi1(faceR,Ng1-ig+1,ib)*F(:)*length*w1(Ng1-ig+1) ! apply weights in reverse
+                resids(elemL,ib,:) = resids(elemL,ib,:) + phiL(faceL,ig,ib)*F(:)*length*w1(ig)
+                resids(elemR,ib,:) = resids(elemR,ib,:) - phiR(faceR,ig,ib)*F(:)*length*w1(Ng1-ig+1) ! apply weights in reverse
             enddo
         enddo
         wavespeed(elemL) = wavespeed(elemL) + smax*length
         wavespeed(elemR) = wavespeed(elemR) + smax*length
     enddo
-    
+    ! print*, resids
     ! -------------------- unpack rBC
     pinf = rBC(1)
     rhoinf = rBC(2)
@@ -129,72 +140,72 @@ subroutine getResidual(q,p,I2E,B2E,In,Bn,rBC,resids,Jinv,detJ,wavespeed,gamma,Rg
         btype = B2E(iface,3)
         face = B2E(iface,2)
         do ig = 1,Ng1
-            call getQ(q(elem,:,:),p,xy1(face,ig,:),1,qI) ! we evaluate these one at a time to simplify code
+            call getQ(q(elem,:,:),p,xyL(face,ig,:),1,qI) ! we evaluate these one at a time to simplify code
             uI = qI(2)/qI(1) ! internal velocity components
             vI = qI(3)/qI(1)
             unplus = uI*nrm(1) + vI*nrm(2) ! internal projected velocity
             if (dirichlet) then ! DIRICHLET BC
                 call getIC(rBC,qBC,gamma)
                 call roeFlux(qI,qBC,F,nrm,gamma,smax)
-        !     else if (btype == 3 .or. btype == 4) then ! WALL BC
-        !         ub = uI - unplus*nrm(1)
-        !         vb = vI - unplus*nrm(2)
-        !         pb = (gamma-1.d0)*(qI(4) - 0.5d0*qI(1)*(ub**2+vb**2))
-        !         ! ------- directly construct flux
-        !         F(1) = 0.d0
-        !         F(2) = pb*nrm(1)
-        !         F(3) = pb*nrm(2)
-        !         F(4) = 0.d0
-        !         ! should you zero out smax here?
-        !         ! smax = 0.d0
-        !     else if (btype == 1) then ! INLET BC
-        !         dn = cos(alpha)*nrm(1) + sin(alpha)*nrm(2)
-        !         pplus = (gamma-1.d0)*(qI(4) - 0.5d0*qI(1)*(uI**2+vI**2))
-        !         cplus = sqrt(gamma*pplus/qI(1))
-        !         Jplus = unplus + 2*cplus/(gamma-1)
-        !         ! --------------- solve for quadratic in Mb
-        !         a = gamma*Rgas*Tt*dn**2 - (gamma-1)/2*Jplus**2
-        !         b = 4*gamma*Rgas*Tt*dn/(gamma-1)
-        !         c = 4*gamma*Rgas*Tt/(gamma-1)**2 - Jplus**2
-        !         det = sqrt(b**2-4*a*c)
-        !         if (-b/(2*a)-det/(2*a) < 0) then
-        !             Mb = (-b+det)/(2*a)
-        !         else
-        !             Mb = (-b-det)/(2*a)
-        !         endif
-        !         Tb = Tt/(1d0 + 0.5d0*(gamma-1d0)*Mb**2)
-        !         pb = pt*(Tb/Tt)**(gamma/(gamma-1d0))
-        !         qBC(1) = pb/(Rgas*Tb)
-        !         cb = sqrt(gamma*pb/qBC(1))
-        !         qBC(2) = Mb*cb*cos(alpha)
-        !         qBC(3) = Mb*cb*sin(alpha)
-        !         qBC(4) = pb/(gamma-1.d0)+0.5d0*qBC(1)*(qBC(2)**2+qBC(3)**2)
-        !         qBC(2) = qBC(2)*qBC(1)
-        !         qBC(3) = qBC(3)*qBC(1)
-        !         call eulerFlux(qBC,F,nrm,gamma,smax)
-        !     else if (btype == 2) then ! OUTLET BC
-        !         pplus = (gamma-1.d0)*(qI(3) - 0.5d0*qI(1)*(uI**2+vI**2))
-        !         Splus = pplus/(qI(1)**gamma)
-        !         qBC(1) = (pinf/Splus)**(1.d0/gamma)
-        !         cplus = sqrt(gamma*pplus/qI(1))
-        !         Jplus = unplus + 2*cplus/(gamma-1.d0)
-        !         cb = sqrt(gamma*pinf/qBC(1))
-        !         unb = Jplus - 2*cb/(gamma-1.d0)
-        !         qBC(2) = uI + (unb-unplus)*nrm(1)
-        !         qBC(3) = vI + (unb-unplus)*nrm(2)
-        !         qBC(4) = pinf/(gamma-1.d0) + 0.5d0 * qBC(1)*(qBC(2)**2 + qBC(3)**2)
-        !         qBC(2) = qBC(2) * qBC(1)
-        !         qBC(3) = qBC(3) * qBC(1)
-        !         call eulerFlux(qBC,F,nrm,gamma,smax)
+            else if (btype == 3 .or. btype == 4) then ! WALL BC
+                ub = uI - unplus*nrm(1)
+                vb = vI - unplus*nrm(2)
+                pb = (gamma-1.d0)*(qI(4) - 0.5d0*qI(1)*(ub**2+vb**2))
+                ! ------- directly construct flux
+                F(1) = 0.d0
+                F(2) = pb*nrm(1)
+                F(3) = pb*nrm(2)
+                F(4) = 0.d0
+                ! should you zero out smax here?
+                ! smax = 0.d0
+            else if (btype == 1) then ! INLET BC
+                dn = cos(alpha)*nrm(1) + sin(alpha)*nrm(2)
+                pplus = (gamma-1.d0)*(qI(4) - 0.5d0*qI(1)*(uI**2+vI**2))
+                cplus = sqrt(gamma*pplus/qI(1))
+                Jplus = unplus + 2*cplus/(gamma-1)
+                ! --------------- solve for quadratic in Mb
+                a = gamma*Rgas*Tt*dn**2 - (gamma-1)/2*Jplus**2
+                b = 4*gamma*Rgas*Tt*dn/(gamma-1)
+                c = 4*gamma*Rgas*Tt/(gamma-1)**2 - Jplus**2
+                det = sqrt(b**2-4*a*c)
+                if (-b/(2*a)-det/(2*a) < 0) then
+                    Mb = (-b+det)/(2*a)
+                else
+                    Mb = (-b-det)/(2*a)
+                endif
+                Tb = Tt/(1d0 + 0.5d0*(gamma-1d0)*Mb**2)
+                pb = pt*(Tb/Tt)**(gamma/(gamma-1d0))
+                qBC(1) = pb/(Rgas*Tb)
+                cb = sqrt(gamma*pb/qBC(1))
+                qBC(2) = Mb*cb*cos(alpha)
+                qBC(3) = Mb*cb*sin(alpha)
+                qBC(4) = pb/(gamma-1.d0)+0.5d0*qBC(1)*(qBC(2)**2+qBC(3)**2)
+                qBC(2) = qBC(2)*qBC(1)
+                qBC(3) = qBC(3)*qBC(1)
+                call eulerFlux(qBC,F,nrm,gamma,smax)
+            else if (btype == 2) then ! OUTLET BC
+                pplus = (gamma-1.d0)*(qI(4) - 0.5d0*qI(1)*(uI**2+vI**2))
+                Splus = pplus/(qI(1)**gamma)
+                qBC(1) = (pinf/Splus)**(1.d0/gamma)
+                cplus = sqrt(gamma*pplus/qI(1))
+                Jplus = unplus + 2*cplus/(gamma-1.d0)
+                cb = sqrt(gamma*pinf/qBC(1))
+                unb = Jplus - 2*cb/(gamma-1.d0)
+                qBC(2) = uI + (unb-unplus)*nrm(1)
+                qBC(3) = vI + (unb-unplus)*nrm(2)
+                qBC(4) = pinf/(gamma-1.d0) + 0.5d0 * qBC(1)*(qBC(2)**2 + qBC(3)**2)
+                qBC(2) = qBC(2) * qBC(1)
+                qBC(3) = qBC(3) * qBC(1)
+                call eulerFlux(qBC,F,nrm,gamma,smax)
             end if
         
             do ib = 1,Nb
-                resids(elem,ib,:) = resids(elem,ib,:) + phi1(face,ig,ib)*F(:)*length*w1(ig)
+                resids(elem,ib,:) = resids(elem,ib,:) + phiL(face,ig,ib)*F(:)*length*w1(ig)
             enddo
         enddo
         wavespeed(elem) = wavespeed(elem) + smax*length
     enddo
-    ! print*, resids(:,3,:)
+    ! print*, resids(:,1,:)
 end subroutine getResidual
 
 subroutine getQ(q,p,xy,n_xy,qState)
