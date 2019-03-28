@@ -1,4 +1,5 @@
-subroutine DG(q,p,resids,maxres,nodes,E2N,I2E,B2E,In,Bn,rBC,gamma,Rgas,CFL,convtol,min_iter,max_iter,nnodes,nelem,niface,nbface)
+subroutine DG(q,p,resids,maxres,detJ,nodes,E2N,I2E,B2E,In,Bn,rBC,gamma,Rgas,CFL,convtol,min_iter,&
+    max_iter,nnodes,nelem,niface,nbface)
     implicit none
     integer, intent(in) :: p,nnodes,nelem,niface,nbface,min_iter,max_iter
     real(8), intent(inout), dimension(nelem,(p+1)*(p+2)/2,4) :: q
@@ -12,16 +13,16 @@ subroutine DG(q,p,resids,maxres,nodes,E2N,I2E,B2E,In,Bn,rBC,gamma,Rgas,CFL,convt
     real(8), intent(in), dimension(5) :: rBC
     real(8), intent(in) :: gamma, Rgas, convtol, CFL
     real(8), intent(out), dimension(max_iter) :: maxres
-!f2py intent(in) node,E2N,I2E,B2E,In,Bn,area,gamma,rBC,centroidvec
-!f2py intent(out) resids, maxres
+    real(8), dimension(nelem),intent(out) :: detJ
+!f2py intent(in) node,E2N,I2E,B2E,In,Bn,gamma,rBC
+!f2py intent(out) resids, maxres, detJ
 !f2py intent(in,out) q
 
     integer :: ielem, Nb
     real(8), dimension(nelem,2,2) :: J, Jinv
-    real(8), dimension(nelem) :: detJ
     real(8), dimension(:,:,:), allocatable :: Minv
     real(8), dimension(nelem) :: wavespeed
-
+    
     ! -----------------------------------
     ! Define constants and allocate arrays
     ! -----------------------------------
@@ -36,8 +37,7 @@ subroutine DG(q,p,resids,maxres,nodes,E2N,I2E,B2E,In,Bn,rBC,gamma,Rgas,CFL,convt
         call getJacobian(nodes(E2N(ielem,:),:), J(ielem,:,:), Jinv(ielem,:,:), detJ(ielem))
     enddo
     call getMassInv(p,detJ,Minv,nelem)
-
-
+    
     call timeIntegration(q,p,I2E,B2E,In,Bn,Jinv,detJ,Minv,rBC,resids,maxres,&
     gamma,Rgas,CFL,convtol,min_iter,max_iter,nelem,niface,nbface)
 

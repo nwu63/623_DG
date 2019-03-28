@@ -32,7 +32,7 @@ subroutine getResidual(q,p,I2E,B2E,In,Bn,rBC,resids,Jinv,detJ,wavespeed,gamma,Rg
     real(8), intent(out), dimension(nelem) :: wavespeed ! this is in fact the sum of length*wavespeed for each cell
 !f2py intent(in) q,I2E,B2E,In,Bn,rBC,gamma, Rgas, Jinv, detJ
 !f2py intent(out) resids,wavespeed
-    integer :: iface, elemL,elemR,faceL,faceR,elem,btype,face,Nb,Ng,ig,ib,g1,Ng1
+    integer :: iface, elemL,elemR,faceL,faceR,elem,btype,face,Nb,Ng,ig,ib,g1,Ng1,g
     real(8), dimension(2) :: nrm
     real(8), dimension(4) :: F,qBC,qI
     real(8) :: length,pinf,Mb,rhoinf,Tt,pt,alpha,Tb,pb,cb,Splus,Jplus,uI,vI,unb,unplus,cplus,pplus,ub,vb,dn,a,b,c,det,smax
@@ -43,18 +43,19 @@ subroutine getResidual(q,p,I2E,B2E,In,Bn,rBC,resids,Jinv,detJ,wavespeed,gamma,Rg
     
     dirichlet = .false.
     resids(:,:,:) = 0.d0 ! reset resids to zero
-    wavespeed(:) = 0
+    wavespeed(:) = 0.d0
     ! -----------------------------------
     ! Pre-compute quantities
     ! -----------------------------------
     Nb = (p+1)*(p+2)/2
-    call Gauss2D_pre(2*p+1,Ng)
+    g = 2*p+1
+    call Gauss2D_pre(g,Ng)
     allocate(xy(Ng,2))
     allocate(w2(Ng))
     allocate(gphi(Ng,Nb,2))
     allocate(vec(Nb,2))
     allocate(qState(Ng,4))
-    call Gauss2D(2*p+1,Ng,xy,w2)
+    call Gauss2D(g,Ng,xy,w2)
     call gbasis2D(xy, p, gphi, Ng)
     
     g1 = 2*p+1
@@ -78,19 +79,10 @@ subroutine getResidual(q,p,I2E,B2E,In,Bn,rBC,resids,Jinv,detJ,wavespeed,gamma,Rg
     call basis2D(xyL(1,:,:), p, phiL(1,:,:), Ng1)
     call basis2D(xyL(2,:,:), p, phiL(2,:,:), Ng1)
     call basis2D(xyL(3,:,:), p, phiL(3,:,:), Ng1)
-    xyR(1,:,1) = xyL(1,Ng1:1:-1,1) ! Now we flip them for the right element
-    xyR(1,:,2) = xyL(1,Ng1:1:-1,2)
-    xyR(2,:,1) = xyL(2,Ng1:1:-1,1)
-    xyR(2,:,2) = xyL(2,Ng1:1:-1,2)
-    xyR(3,:,1) = xyL(3,Ng1:1:-1,1)
-    xyR(3,:,2) = xyL(3,Ng1:1:-1,2)
+    xyR(:,:,:) = xyL(:,Ng1:1:-1,:) ! Now we flip them for the right element
     call basis2D(xyR(1,:,:), p, phiR(1,:,:), Ng1)
     call basis2D(xyR(2,:,:), p, phiR(2,:,:), Ng1)
     call basis2D(xyR(3,:,:), p, phiR(3,:,:), Ng1)
-    ! print*, x
-    ! print*, phi1(1,:,:)
-    ! print*, phi1(2,:,:)
-    ! print*, phi1(3,:,:)
 
     ! ------------------- interior element contribution
     do elem = 1,nelem
@@ -98,7 +90,7 @@ subroutine getResidual(q,p,I2E,B2E,In,Bn,rBC,resids,Jinv,detJ,wavespeed,gamma,Rg
         do ig = 1,Ng
             vec = matmul(gphi(ig,:,:),Jinv(elem,:,:))
             do ib = 1,Nb
-                call eulerFlux(qState(ig,:),F,vec(ib,:),gamma,smax) ! we actually only need to get F as 4x2 once, then dot
+                call eulerFlux(qState(ig,:),F,vec(ib,:),gamma,smax) ! TODO: we actually only need to get F as 4x2 once
                 resids(elem,ib,:) = resids(elem,ib,:) - norm2(vec(ib,:))*F(:)*detJ(elem)*w2(ig)
             enddo
         enddo
@@ -121,9 +113,9 @@ subroutine getResidual(q,p,I2E,B2E,In,Bn,rBC,resids,Jinv,detJ,wavespeed,gamma,Rg
                 resids(elemL,ib,:) = resids(elemL,ib,:) + phiL(faceL,ig,ib)*F(:)*length*w1(ig)
                 resids(elemR,ib,:) = resids(elemR,ib,:) - phiR(faceR,ig,ib)*F(:)*length*w1(Ng1-ig+1) ! apply weights in reverse
             enddo
+            wavespeed(elemL) = wavespeed(elemL) + smax*length * w1(ig)
+            wavespeed(elemR) = wavespeed(elemR) + smax*length * w1(Ng1-ig+1)
         enddo
-        wavespeed(elemL) = wavespeed(elemL) + smax*length
-        wavespeed(elemR) = wavespeed(elemR) + smax*length
     enddo
     ! print*, resids
     ! -------------------- unpack rBC
@@ -201,10 +193,10 @@ subroutine getResidual(q,p,I2E,B2E,In,Bn,rBC,resids,Jinv,detJ,wavespeed,gamma,Rg
         
             do ib = 1,Nb
                 resids(elem,ib,:) = resids(elem,ib,:) + phiL(face,ig,ib)*F(:)*length*w1(ig)
-            enddo
-        enddo
-        wavespeed(elem) = wavespeed(elem) + smax*length
-    enddo
+            enddo ! ib
+            wavespeed(elem) = wavespeed(elem) + smax*length*w1(ig)
+        enddo ! ig
+    enddo ! iface
     ! print*, resids(:,1,:)
 end subroutine getResidual
 
@@ -222,7 +214,8 @@ subroutine getQ(q,p,xy,n_xy,qState)
     !   qState[n_xy,4] = the state for each point
     ! 
     ! -----------------------------------------------------------------------
-    integer, intent(in) :: p
+    implicit none
+    integer, intent(in) :: p,n_xy
     real(8), intent(in), dimension(n_xy,2) :: xy
     real(8), intent(in), dimension((p+1)*(p+2)/2,4) :: q
     real(8), intent(out), dimension(n_xy,4) :: qState
@@ -262,11 +255,11 @@ subroutine getIC(rBC,q,gamma)
     pt = rBC(4)
     alpha = rBC(5)
     c = sqrt(gamma*pinf/rhoinf)
-    Minf = sqrt((Tt - 1)*2/(gamma-1))
+    Minf = sqrt((Tt - 1.d0)*2.d0/(gamma-1.d0))
     u = Minf*c*cos(alpha)
     v = Minf*c*sin(alpha)
     q(1) = rhoinf
     q(2) = rhoinf*u
     q(3) = rhoinf*v
-    q(4) = pinf/(gamma-1) + 0.5*rhoinf*(u**2+v**2)
+    q(4) = pinf/(gamma-1.d0) + 0.5d0*rhoinf*(u**2.d0+v**2.d0)
 end subroutine getIC

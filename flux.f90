@@ -25,8 +25,8 @@ subroutine eulerFlux(q,F,vec,gamma,smax)
     real(8), dimension(0:1) :: nrm
     nrm = vec / norm2(vec) ! we always normalize nrm
     unorm = q(1)/q(0)*nrm(0) + q(2)/q(0)*nrm(1)
-    velnorm = sqrt((q(1)/q(0))**2 + (q(2)/q(0))**2) ! this is the norm of velocity vector
-    p = (gamma-1)*(q(3) - 0.5d0*q(0)*velnorm**2)
+    velnorm = sqrt((q(1)/q(0))**2.d0 + (q(2)/q(0))**2.d0) ! this is the norm of velocity vector
+    p = (gamma-1)*(q(3) - 0.5d0*q(0)*velnorm**2.d0)
     H = q(3)/q(0) + p/q(0)
     c = sqrt(gamma*p/q(0))
     lambda(0) = unorm+c
@@ -35,17 +35,17 @@ subroutine eulerFlux(q,F,vec,gamma,smax)
     smax = maxval(abs(lambda))
     ! ---------- F1 and F2 are the fluxes in the x and y directions
     F1(0) = q(1)
-    F1(1) = q(1)**2/q(0) + p
+    F1(1) = q(1)**2.d0/q(0) + p
     F1(2) = q(1)*q(2)/q(0)
     F1(3) = q(1)*H
 
     F2(0) = q(2)
     F2(1) = q(1)*q(2)/q(0)
-    F2(2) = q(2)**2/q(0) + p
+    F2(2) = q(2)**2.d0/q(0) + p
     F2(3) = q(2)*H
 
     F = F1(:)*nrm(0) + F2(:)*nrm(1) ! Here we project it to the normal direction
-    if (norm2(vec) <= 1.d-15) then
+    if (norm2(vec) <= 5.d-16) then
         F = 0.d0
     endif
 end subroutine eulerFlux
@@ -73,10 +73,10 @@ subroutine roeAvgState(qL,qR,qA,gamma)
     real(8) :: velnormL, velnormR, pL, pR, HL, HR, RL, RR
     ! _____________________
     ! begin main execution 
-    velnormL = sqrt((qL(1)/qL(0))**2 + (qL(2)/qL(0))**2)
-    velnormR = sqrt((qR(1)/qR(0))**2 + (qR(2)/qR(0))**2)
-    pL = (gamma-1)*(qL(3) - 0.5d0*qL(0)*velnormL**2)
-    pR = (gamma-1)*(qR(3) - 0.5d0*qR(0)*velnormR**2)
+    velnormL = sqrt((qL(1)/qL(0))**2.d0 + (qL(2)/qL(0))**2.d0)
+    velnormR = sqrt((qR(1)/qR(0))**2.d0 + (qR(2)/qR(0))**2.d0)
+    pL = (gamma-1.d0)*(qL(3) - 0.5d0*qL(0)*velnormL**2.d0)
+    pR = (gamma-1.d0)*(qR(3) - 0.5d0*qR(0)*velnormR**2.d0)
     HL = qL(3)/qL(0) + pL/qL(0)
     HR = qR(3)/qR(0) + pR/qR(0)
 
@@ -123,9 +123,9 @@ subroutine roeFlux(qL,qR,F,vec,gamma,smax)
     dq = qR - qL ! difference in two states
     call roeAvgState(qL,qR,qA,gamma) ! remember that qA is not scaled by density! [rho,u,v,E]
     unorm = qA(0)*nrm(0) + qA(1)*nrm(1) ! this is velocity projected to the nrm dir
-    velnorm = sqrt(qA(0)**2 + qA(1)**2) ! this is the norm of the velocity vector
+    velnorm = sqrt(qA(0)**2.d0 + qA(1)**2.d0) ! this is the norm of the velocity vector
     H = qA(2)
-    c = sqrt((gamma-1)*(H - 0.5d0*velnorm**2))
+    c = sqrt((gamma-1.d0)*(H - 0.5d0*velnorm**2.d0))
     M = velnorm/c
     ! ------------------ see Kfid 623 notes for definitions/approach
     lambda(0) = unorm+c ! these are the eigenvalues of flux Jacobian
@@ -142,11 +142,11 @@ subroutine roeFlux(qL,qR,F,vec,gamma,smax)
         lambda(2) = (epsilon**2 + lambda(2)**2)/(2*epsilon)
     endif
     smax = maxval(abs(lambda))
-    G1 = (gamma-1)*(velnorm**2/2*dq(0) - qA(0)*dq(1) - qA(1)*dq(2) + dq(3))
+    G1 = (gamma-1)*(velnorm**2.d0/2.d0*dq(0) - qA(0)*dq(1) - qA(1)*dq(2) + dq(3))
     G2 = -unorm*dq(0) + dq(1)*nrm(0) + dq(2)*nrm(1)
     s1 = 0.5d0*(abs(lambda(0))+abs(lambda(1)))
     s2 = 0.5d0*(abs(lambda(0))-abs(lambda(1)))
-    C1 = G1/c**2*(s1-abs(lambda(2))) + G2/c*s2
+    C1 = G1/c**2.d0*(s1-abs(lambda(2))) + G2/c*s2
     C2 = G1/c*s2 + (s1-abs(lambda(2)))*G2
 
     ! ----------------- R vector is the second vector subtracted from avg flux

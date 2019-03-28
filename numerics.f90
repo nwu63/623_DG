@@ -3,11 +3,10 @@ subroutine fullOrder(r,s,p,k)
     integer, intent(in) :: r,s,p
     integer, intent(out) :: k
     integer :: sp
-    k = 0
+    k = r + 1
     do sp = 0, s-1
         k = k + (p + 1 - sp)
     enddo
-    k = k + r + 1
 end subroutine fullOrder
 
 subroutine triLagrange2D(p,C)
@@ -39,57 +38,8 @@ subroutine triLagrange2D(p,C)
 end subroutine triLagrange2D
 
 
-subroutine lagrange(xn,j, x, phi, n_xn, n_x)
-    ! computes values of jth lagrange function based on nodes
-    ! in xn, at the x-values given in x
-
-    integer, intent(in) :: j, n_xn, n_x
-    real(8), intent(in), dimension(n_xn) :: xn
-    real(8), intent(in), dimension(n_x) :: x
-    real(8), intent(out), dimension(n_x) :: phi
-!f2py intent(in) xn,x
-!f2py intent(out) phi
-    real(8), dimension(n_xn-1) :: xnj
-    integer, dimension(n_xn-1) :: idx
-    integer :: i
-    real(8) :: den
-    real(8), dimension(n_x) :: num
-
-    if (n_xn == 1) then
-        phi(:) = 1.d0
-        return
-    endif
-
-    idx = (/(i,i=1,n_xn-1)/)
-    where (idx>=j)
-        idx = idx + 1
-    endwhere
-
-    xnj = xn(idx)
-    den = product(xn(j)-xnj)
-    num = product(spread(x,2,n_xn-1) - spread(xnj,1,n_x), 2)
-    print*, den,num
-    phi = num/den
-end subroutine lagrange
-
-subroutine basis1D(xn, x, phi, n_xn, n_x)
-    ! evaluates basis functions at x
-    integer, intent(in) :: n_xn, n_x
-    real(8), intent(in), dimension(n_xn) :: xn
-    real(8), intent(in), dimension(n_x) :: x
-    real(8), intent(out), dimension(n_x,n_xn) :: phi
-!f2py intent(in) xn,x
-!f2py intent(out) phi
-    integer :: p
-    real(8), dimension(n_x) :: B
-    
-    do p = 0,n_xn-1
-        call lagrange(xn,p+1, x, B, n_xn, n_x)
-        Phi(:,p+1) = B
-    enddo
-end subroutine basis1D
-
 subroutine basis2D(xy, p, phi, n_xy)
+    implicit none
     ! evaluates 2D basis functions at xy
     integer, intent(in) :: n_xy, p
     real(8), intent(in), dimension(n_xy,2) :: xy
@@ -114,6 +64,7 @@ subroutine basis2D(xy, p, phi, n_xy)
 end subroutine basis2D
 
 subroutine gbasis2D(xy, p, gphi, n_xy)
+    implicit none
     ! evaluates gradient of 2D basis functions at xy
     integer, intent(in) :: n_xy, p
     real(8), intent(in), dimension(n_xy,2) :: xy
@@ -140,6 +91,16 @@ end subroutine gbasis2D
 
 
 subroutine matInv(n,A,Ainv)
+    ! -----------------------------------------------------------------------
+    ! Purpose: Calculates the matrix inverse of A using LAPACK's LU factorization
+    ! 
+    ! Inputs:
+    !   n = the size of the system
+    !   A[n,n] = the matrix to be inverted
+    ! 
+    ! Outs:
+    !   Ainv[n,n] = the inverse of matrix A
+    ! -----------------------------------------------------------------------
     implicit none
     integer, intent(in) :: n
     real(8), intent(in),dimension(n,n) :: A
@@ -151,7 +112,7 @@ subroutine matInv(n,A,Ainv)
     integer :: info
     integer, dimension(n) :: ipiv
     LU = A
-    CALL DGETRF(n,n,LU,n,ipiv,info)
+    call DGETRF(n,n,LU,n,ipiv,info)
     Ainv = LU
     call DGETRI(n,Ainv,n,ipiv,work,n,info)
 end subroutine matInv

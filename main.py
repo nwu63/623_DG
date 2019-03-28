@@ -1,11 +1,11 @@
-from fortran import dg, getjacobian,basis2d,getrefmassmatrix,roeflux,eulerflux,basis2d,gbasis2d
+from fortran import dg, getjacobian,basis2d,getrefmassmatrix,roeflux,eulerflux,basis2d,gbasis2d,integrate,getmassinv
 import numpy as np
-
+import matplotlib.pyplot as plt
 from fileIO import readMesh, readMeshMatrices, writeSolution, readSolution
 from processMesh import signedArea, computeCentroidVec
 from constants import GAS_CONSTANT, GAMMA, getIC, getBC
 import argparse
-
+from plotting import plotSolution, plotCp
 
 def initSolution(p,restart=False,filename=None):
     if restart != 0:
@@ -37,7 +37,7 @@ def testmat():
 
 def test_basis():
     xy = np.random.rand(10,2)
-    p = 0
+    p = 4
     phi = basis2d(xy, p)
     gphi = gbasis2d(xy, p)
     print(np.sum(phi,axis=1))
@@ -60,20 +60,45 @@ if __name__ == '__main__':
     node, E2N, bdy = readMesh('../../grid/'+meshFile)
     I2E, B2E, In, Bn, area = readMeshMatrices('../../grid/'+meshFile+'_mat')
     
+    # I2E = np.array([[0,0,0,0]])
+    # In = np.array([[0,0,0]])
 
     nelem = E2N.shape[0]
     nnode = node.shape[0]
     niface = I2E.shape[0]
     nbface = B2E.shape[0]
 
+    # Minv = getmassinv(args.p,np.ones(2))
+    # print(Mref)
+    # print(Minv[0,:,:])
+    # # print(np.linalg.inv(Mref) - Minv[0,:,:])
+    # print(np.linalg.det(Mref))
+    # exit()
+    
+
     rBC = getBC()
     q = initSolution(p,restart=restart)
-    CFL = 0.001
+    CFL = 0.05
     convtol = 1e-7
     miniter = 1e3
     maxiter = 1e5
 
-    q,resids,maxres = dg(q,p,node,E2N,I2E,B2E,In,Bn,rBC,GAMMA,GAS_CONSTANT,CFL,convtol,miniter,maxiter,nnode,nelem,niface,nbface)
+    q,resids,maxres,detJ = dg(q,p,node,E2N,I2E,B2E,In,Bn,rBC,GAMMA,GAS_CONSTANT,CFL,convtol,miniter,maxiter,nnode,nelem,niface,nbface)
+
+    cl,cd,Es,cp,mach = integrate(q,p,B2E,Bn,rBC,detJ,GAMMA,GAS_CONSTANT,nelem,nbface)
+    print(np.max(np.abs(resids)))
+    # print(resids[:,:,0])
+    # print(resids[:,:,1])
+    # print(resids[:,:,2])
+    # print(resids[:,:,3])
+    print(cl,cd,Es)
+
+    E2N -= 1
+    B2E[0:1] -= 1
+    plotSolution(node,E2N,mach)
+    plotCp(node,E2N,B2E,cp)
+    plt.show()
+
     # print(np.squeeze(resids))
     # print(np.max(np.abs(resids)))
     # Mref = getrefmassmatrix(0)

@@ -1,3 +1,4 @@
+! TODO: add fail flag
 subroutine timeIntegration(q,p,I2E,B2E,In,Bn,Jinv,detJ,Minv,rBC,resids,resnorm,&
     gamma,Rgas,CFL,convtol,min_iter,max_iter,nelem,niface,nbface)
     ! -----------------------------------------------------------------------
@@ -53,23 +54,25 @@ subroutine timeIntegration(q,p,I2E,B2E,In,Bn,Jinv,detJ,Minv,rBC,resids,resnorm,&
         endif
         
         do ielem = 1,nelem
-            dt = 2*CFL/wavespeed(ielem)
+            dt = CFL*detJ(ielem)/wavespeed(ielem) ! we let detJ = 2*area
             do iq = 1,4
                 qFE(ielem,:,iq) = q(ielem,:,iq) - dt*matmul(Minv(ielem,:,:),resids(ielem,:,iq)) ! the area term cancels with the dt expression
             enddo
         enddo
-        if (p >= 0) then ! for now do FE for everything
+        if (p >= 0) then 
             q = qFE
-        elseif (p >= 1) then
-            call getResidual(q,p,I2E,B2E,In,Bn,rBC,resids,Jinv,detJ,wavespeed,gamma,Rgas,nelem,niface,nbface)
-            do ielem = 1,nelem
-                dt = 2*CFL/wavespeed(ielem)
-                q(ielem,:,:) = 0.5d0*(q(ielem,:,:) + qFE(ielem,:,:) - dt*resids(ielem,:,:))
-            enddo
+        ! elseif (p > 0) then
+        !     call getResidual(q,p,I2E,B2E,In,Bn,rBC,resids,Jinv,detJ,temp_wavespeed,gamma,Rgas,nelem,niface,nbface)
+        !     do ielem = 1,nelem
+        !         dt = CFL*detJ(ielem)/wavespeed(ielem)
+        !         do iq = 1,4
+        !             q(ielem,:,iq) = 0.5d0*(q(ielem,:,iq) + qFE(ielem,:,iq) - dt*matmul(Minv(ielem,:,:),resids(ielem,:,iq)))
+        !         enddo
+        !     enddo
         endif
-        if ((iter > max_iter) .or. (iter > min_iter .and. resnorm(iter) < convtol) .or. resnorm(iter) /= resnorm(iter)) then
+        if ((iter > min_iter .and. resnorm(iter) < convtol) .or. resnorm(iter) /= resnorm(iter)) then
             exit
         endif
     enddo
-    print*, "Converged! Took ", iter, " iterations to reduce residual to ",resnorm(iter)
+    print*, "Converged! Took ", iter-1, " iterations to reduce residual to ",resnorm(iter)
 end subroutine timeIntegration
