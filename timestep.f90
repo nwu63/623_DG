@@ -1,4 +1,7 @@
 ! TODO: add fail flag
+! TODO: add applyMatRes subroutine
+! TODO: check iteration counting in print out
+! TODO: try dgemm instead of matmul
 subroutine timeIntegration(q,p,I2E,B2E,In,Bn,Jinv,detJ,Minv,rBC,resids,resnorm,&
     gamma,Rgas,CFL,convtol,min_iter,max_iter,nelem,niface,nbface)
     ! -----------------------------------------------------------------------
@@ -40,8 +43,8 @@ subroutine timeIntegration(q,p,I2E,B2E,In,Bn,Jinv,detJ,Minv,rBC,resids,resnorm,&
 !f2py intent(in,out) q
     integer :: ielem, iter, iq
     integer, dimension(3) :: loc
-    real(8), dimension(nelem) :: wavespeed, temp_wavespeed ! temp is used b/c we want to use same wavespeed from FE step
-    real(8), dimension(nelem,(p+1)*(p+2)/2,4) :: qFE
+    real(8), dimension(nelem) :: wavespeed
+    real(8), dimension(nelem,(p+1)*(p+2)/2,4) :: q1,q2
     real(8) :: dt
     resnorm(:) = -1 ! set to high value to allow first pass of while loop
     
@@ -56,19 +59,35 @@ subroutine timeIntegration(q,p,I2E,B2E,In,Bn,Jinv,detJ,Minv,rBC,resids,resnorm,&
         do ielem = 1,nelem
             dt = CFL*detJ(ielem)/wavespeed(ielem) ! we let detJ = 2*area
             do iq = 1,4
-                qFE(ielem,:,iq) = q(ielem,:,iq) - dt*matmul(Minv(ielem,:,:),resids(ielem,:,iq)) ! the area term cancels with the dt expression
+                q1(ielem,:,iq) = q(ielem,:,iq) - dt*matmul(Minv(ielem,:,:),resids(ielem,:,iq)) ! the area term cancels with the dt expression
             enddo
         enddo
-        if (p >= 0) then 
-            q = qFE
-        ! elseif (p > 0) then
-        !     call getResidual(q,p,I2E,B2E,In,Bn,rBC,resids,Jinv,detJ,temp_wavespeed,gamma,Rgas,nelem,niface,nbface)
-        !     do ielem = 1,nelem
-        !         dt = CFL*detJ(ielem)/wavespeed(ielem)
-        !         do iq = 1,4
-        !             q(ielem,:,iq) = 0.5d0*(q(ielem,:,iq) + qFE(ielem,:,iq) - dt*matmul(Minv(ielem,:,:),resids(ielem,:,iq)))
-        !         enddo
-        !     enddo
+        if (p == 0) then 
+            q = q1
+        elseif (p == 1) then
+            call getResidual(q1,p,I2E,B2E,In,Bn,rBC,resids,Jinv,detJ,wavespeed,gamma,Rgas,nelem,niface,nbface)
+            do ielem = 1,nelem
+                dt = CFL*detJ(ielem)/wavespeed(ielem)
+                do iq = 1,4
+                    q(ielem,:,iq) = 0.5d0*(q(ielem,:,iq) + q1(ielem,:,iq) - dt*matmul(Minv(ielem,:,:),resids(ielem,:,iq)))
+                enddo
+            enddo
+        elseif (p == 2) then
+            call getResidual(q1,p,I2E,B2E,In,Bn,rBC,resids,Jinv,detJ,wavespeed,gamma,Rgas,nelem,niface,nbface)
+            do ielem = 1,nelem
+                dt = CFL*detJ(ielem)/wavespeed(ielem)
+                do iq = 1,4
+                    q2(ielem,:,iq) = 0.25d0*(3.d0*q(ielem,:,iq) + q1(ielem,:,iq) - dt*matmul(Minv(ielem,:,:),resids(ielem,:,iq)))
+                enddo
+            enddo
+            call getResidual(q2,p,I2E,B2E,In,Bn,rBC,resids,Jinv,detJ,wavespeed,gamma,Rgas,nelem,niface,nbface)
+            do ielem = 1,nelem
+                dt = CFL*detJ(ielem)/wavespeed(ielem)
+                do iq = 1,4
+                    q(ielem,:,iq) = 1.d0/3.d0*(q(ielem,:,iq) + 2.d0*q2(ielem,:,iq) &
+                    - 2.d0*dt*matmul(Minv(ielem,:,:),resids(ielem,:,iq)))
+                enddo
+            enddo
         endif
         if ((iter > min_iter .and. resnorm(iter) < convtol) .or. resnorm(iter) /= resnorm(iter)) then
             exit

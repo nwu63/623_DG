@@ -1,3 +1,4 @@
+from __future__ import division
 from fortran import dg, getjacobian,basis2d,getrefmassmatrix,roeflux,eulerflux,basis2d,gbasis2d,integrate,getmassinv
 import numpy as np
 import matplotlib.pyplot as plt
@@ -78,7 +79,7 @@ if __name__ == '__main__':
 
     rBC = getBC()
     q = initSolution(p,restart=restart)
-    CFL = 0.05
+    CFL = 1/(1+p)
     convtol = 1e-7
     miniter = 1e3
     maxiter = 1e5
