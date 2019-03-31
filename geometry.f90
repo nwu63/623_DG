@@ -14,19 +14,25 @@ subroutine getJacobian(nodes, J, Jinv, detJ)
 end subroutine getJacobian
 
 
-subroutine getHOJacobian(nodes, geom, xy, J, Jinv, detJ)
+subroutine getHOJacobian(nodes, geom, xy, J, Jinv, detJ, n_xy)
     implicit none
-    integer, intent(in) :: geom
+    integer, intent(in) :: geom, n_xy
     real(8), intent(in), dimension((geom+1)*(geom+2)/2,2) :: nodes
-    real(8), intent(in), dimension(2) :: xy
-    real(8), intent(out),dimension(2,2) :: J, Jinv
-    real(8), intent(out) :: detJ
+    real(8), intent(in), dimension(n_xy,2) :: xy
+    real(8), intent(out),dimension(n_xy,2,2) :: J, Jinv
+    real(8), intent(out),dimension(n_xy) :: detJ
 !f2py intent(in) nodes
 !f2py intent(out) J, Jinv, detJ
-    real(8), dimension((geom+1)*(geom+2)/2,2) :: gphi
+    real(8), dimension(n_xy,(geom+1)*(geom+2)/2,2) :: gphi
+    integer :: ig
 
     call gbasis2D(xy, geom, gphi, 1)
-    J(:,:) = matmul(transpose(nodes(:,:)),gphi(:,:))
-    detJ = J(1,1) * J(2,2) - J(2,1) * J(1,2)
-    call matInv(2,J,Jinv)
+    do ig = 1,n_xy
+        J(ig,:,:) = matmul(transpose(nodes(:,:)),gphi(ig,:,:))
+        detJ(ig) = J(ig,1,1) * J(ig,2,2) - J(ig,2,1) * J(ig,1,2)
+        call matInv(2,J,Jinv(ig,:,:))
+    enddo
 end subroutine getHOJacobian
+
+! subroutine getEdgeNrmJac()
+! end subroutine getEdgeNrmJac

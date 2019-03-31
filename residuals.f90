@@ -1,3 +1,4 @@
+! TODO: have precomputation/evaluation of quadratures in DG
 subroutine getResidual(q,p,I2E,B2E,In,Bn,rBC,resids,Jinv,detJ,wavespeed,gamma,Rgas,nelem,niface,nbface)
     ! -----------------------------------------------------------------------
     ! Purpose: Calculates the residual over the entire domain

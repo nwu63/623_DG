@@ -101,10 +101,10 @@ if __name__ == '__main__':
     # print(resids[:,:,3])
     print(cl,cd,Es)
 
-    E2N -= 1
+    E2N[0] -= 1
     B2E[0:1] -= 1
-    plotSolution(node,E2N,mach)
-    plotCp(node,E2N,B2E,cp)
+    plotSolution(node,E2N[0],mach)
+    plotCp(node,E2N[0],B2E,cp)
     plt.show()
 
     # print(np.squeeze(resids))
