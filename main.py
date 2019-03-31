@@ -67,13 +67,9 @@ if __name__ == '__main__':
         E2N = [E2N, np.zeros((1,4))]
         qlist = np.array([])
     elif args.q >= 1:
-        node, E2N, bdy,qlist = readCurvedMesh('../../grid/'+meshFile+'_'+str(args.q))
+        node, E2N, bdy,qlist = readCurvedMesh('../../grid/'+meshFile+'_'+str(args.q)+'_linear')
         
-    
-    print(qlist)
-    exit()
-
-    nelem = E2N.shape[0]
+    nelem = E2N[0].shape[0]
     nnode = node.shape[0]
     niface = I2E.shape[0]
     nbface = B2E.shape[0]
@@ -93,7 +89,9 @@ if __name__ == '__main__':
     miniter = 1e3
     maxiter = 1e5
 
-    q,resids,maxres,detJ = dg(q,p,node,E2N[0],E2N[1],I2E,B2E,In,Bn,rBC,GAMMA,GAS_CONSTANT,CFL,convtol,miniter,maxiter,nnode,nelem,niface,nbface)
+    q,resids,maxres,detJ = dg(q,p,geom,node,qlist,E2N[0],E2N[1],I2E,B2E,In,Bn,rBC,GAMMA,GAS_CONSTANT,CFL,convtol,miniter,maxiter)
+    # (q,p,geom,resids,maxres,detJ,nodes,qlist,E2N1,E2N2,I2E,B2E,In,Bn,rBC,gamma,Rgas,CFL,convtol,min_iter,&
+    # max_iter,nnodes,nelem,niface,nbface,nqelem)
 
     cl,cd,Es,cp,mach = integrate(q,p,B2E,Bn,rBC,detJ,GAMMA,GAS_CONSTANT,nelem,nbface)
     print(np.max(np.abs(resids)))
