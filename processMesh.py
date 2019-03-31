@@ -63,3 +63,64 @@ def computeCentroidVec(node,E2N):
             midpoint = (p1+p2)/2
             centroidvec[ielem,iedge] = midpoint - centroid
     return centroidvec
+
+
+
+
+def curveMesh(node,E2N,B2E,q):
+    E2N -= 1 # convert to 0-based
+    B2E[:,[0,1]] -= 1 
+    nbface = B2E.shape[0]
+    qlist = [] #high q list of elems
+    nnode = node.shape[0]
+    node_num = nnode + 1
+    E2N_new = np.array([])
+    for ib in range(nbface):
+        if B2E[ib,2] == 4: # bottom wall
+            elem = B2E[ib,0]
+            face = B2E[ib,1]
+            qlist.append(elem)
+            elem_E2N = list(E2N[elem,:]) # copy elem row in E2N
+            for iface in range(3):
+                xy = getNode(node,E2N,elem,face) # node on face and elem
+                new_xy = np.zeros((q+1,2))
+                new_xy[:,0] = np.linspace(xy[0,0],xy[1,0],q+1) # new nodes on face + old nodes
+                new_xy[:,1] = np.linspace(xy[0,1],xy[1,1],q+1)
+                new_nodes = new_xy[2:-1,:]; # only new nodes
+                if iface == face: # project to bump
+                    new_xy[:,1] = bump(new_xy[:,0])
+                node = np.vstack([node,new_xy]) # add node entry
+                idx = (iface+1)%3
+                if idx == 3:
+                    idx = 0
+                insert = idx + iface*(q-1)
+                elem_E2N = [elem_E2N[0:insert],np.arange(node_num,node_num+q-2),elem_E2N[insert+1:]]
+                node_num = node_num + q - 1
+            if E2N_new.size == 0:
+                E2N_new = elem_E2N
+                print(elem_E2N)
+            else:
+                E2N_new = np.vstack([E2N_new,elem_E2N])
+    E2N += 1
+    E2N_new += 1
+    qlist = np.array(qlist)
+    return node,E2N,E2N_new,qlist
+
+def getNode(node,E2N,elem,face):
+    print(face)
+    idx = E2N[elem,:]
+    xy = np.zeros((2,2))
+    j = 0
+    idx2 = np.zeros(2)
+    print(node.shape)
+    for i in range(3):
+        if i != face:
+            xy[j,:] = node[idx[i],:]
+            idx2[j] = i
+            j = j + 1
+    return xy
+
+
+    
+def bump(x):
+    return 0.0625*np.exp(-25*x**2)

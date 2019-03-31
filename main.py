@@ -2,8 +2,8 @@ from __future__ import division
 from fortran import dg, getjacobian,basis2d,getrefmassmatrix,roeflux,eulerflux,basis2d,gbasis2d,integrate,getmassinv
 import numpy as np
 import matplotlib.pyplot as plt
-from fileIO import readMesh, readMeshMatrices, writeSolution, readSolution
-from processMesh import signedArea, computeCentroidVec
+from fileIO import readMesh, readCurvedMesh, readMeshMatrices, writeSolution, readSolution
+from processMesh import signedArea, curveMesh
 from constants import GAS_CONSTANT, GAMMA, getIC, getBC
 import argparse
 from plotting import plotSolution, plotCp
@@ -47,10 +47,12 @@ def test_basis():
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--p", type=int, default=0)
+    parser.add_argument("--q", type=int, default=1)
     parser.add_argument("--mesh", type=str, default='test')
     args = parser.parse_args()
     meshFile = args.mesh
     p = args.p
+    geom = args.q
     # saveFile = '../solution_0/'+meshFile+'_'+str(order)+'_sol'
     # restartFile = '../solution_0/'+meshFile+'_1_sol'
     # restartFile = saveFile
@@ -58,11 +60,18 @@ if __name__ == '__main__':
     writeSol = False
 
 
-    node, E2N, bdy = readMesh('../../grid/'+meshFile)
-    I2E, B2E, In, Bn, area = readMeshMatrices('../../grid/'+meshFile+'_mat')
     
-    # I2E = np.array([[0,0,0,0]])
-    # In = np.array([[0,0,0]])
+    I2E, B2E, In, Bn, area = readMeshMatrices('../../grid/'+meshFile+'_mat')
+    if args.q == 1:
+        node, E2N, bdy = readMesh('../../grid/'+meshFile)
+        E2N = [E2N, np.zeros((1,4))]
+        qlist = np.array([])
+    elif args.q >= 1:
+        node, E2N, bdy,qlist = readCurvedMesh('../../grid/'+meshFile+'_'+str(args.q))
+        
+    
+    print(qlist)
+    exit()
 
     nelem = E2N.shape[0]
     nnode = node.shape[0]
@@ -84,7 +93,7 @@ if __name__ == '__main__':
     miniter = 1e3
     maxiter = 1e5
 
-    q,resids,maxres,detJ = dg(q,p,node,E2N,I2E,B2E,In,Bn,rBC,GAMMA,GAS_CONSTANT,CFL,convtol,miniter,maxiter,nnode,nelem,niface,nbface)
+    q,resids,maxres,detJ = dg(q,p,node,E2N[0],E2N[1],I2E,B2E,In,Bn,rBC,GAMMA,GAS_CONSTANT,CFL,convtol,miniter,maxiter,nnode,nelem,niface,nbface)
 
     cl,cd,Es,cp,mach = integrate(q,p,B2E,Bn,rBC,detJ,GAMMA,GAS_CONSTANT,nelem,nbface)
     print(np.max(np.abs(resids)))

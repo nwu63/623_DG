@@ -25,6 +25,34 @@ def readMesh(fname):
 
     return node, E2N, bdy
 
+def readCurvedMesh(fname):
+    f = open(fname+'.gri', 'r')
+    Nn, Ne, dim = [int(s) for s in f.readline().split()]
+    # read vertices
+    node = np.array([[float(s) for s in f.readline().split()] for n in range(Nn)])
+    # read boundaries
+    NB = int(f.readline())
+    bdy = []
+    for i in range(NB):
+        s = f.readline().split()
+        Nb = int(s[0])
+        Bi = np.array([[int(s) for s in f.readline().split()] for n in range(Nb)])
+        bdy.append({'nbface':Nb,'nnode':s[1],'name':s[2],'NB':Bi})
+    # read elements
+    E2N = []
+    for i in range(2):
+        s = f.readline().split(); ne = int(s[0])
+        Ei = np.array([[int(s) for s in f.readline().split()] for n in range(ne)])
+        E2N.append(Ei)
+    q = f.readline().split();nq = int(q[0])
+    qlist = np.zeros(nq)
+    for i in range(nq):
+        s = f.readline()
+        qlist[i] = int(s)
+    f.close()
+
+    return node, E2N, bdy, qlist
+
 def readMeshMatrices(fname):
     f = open(fname+'.dat', 'r')
     # read I2E
