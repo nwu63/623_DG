@@ -1,5 +1,3 @@
-!TODO: refactor code to pre-compute 1D and 2D integration points here.
-!      Also pre-allocate things like Jacobians etc for different q elements
 subroutine DG(q,p,geom,resids,maxres,detJ,nodes,qlist,E2N1,E2N2,I2E,B2E,In,Bn,rBC,gamma,Rgas,CFL,convtol,min_iter,&
     max_iter,nnodes,nelem,niface,nbface,nqelem)
     implicit none
@@ -28,7 +26,7 @@ subroutine DG(q,p,geom,resids,maxres,detJ,nodes,qlist,E2N1,E2N2,I2E,B2E,In,Bn,rB
     real(8), dimension(:,:,:), allocatable :: Minv, gphi, xyL, phiL,xyR, phiR,qnrm ! xy1 is the edge integration points on T
     real(8), dimension(:,:), allocatable :: xy,phi, detJ2, qlength
     real(8), dimension(:), allocatable :: w,x,w1
-    real(8), dimension(nelem) :: wavespeed
+    ! real(8), dimension(nelem) :: wavespeed
     real(8), dimension(2,2) :: temp1,Jedge
     real(8), dimension(2) :: vec,tangent
     ! -----------------------------------
@@ -113,7 +111,7 @@ subroutine DG(q,p,geom,resids,maxres,detJ,nodes,qlist,E2N1,E2N2,I2E,B2E,In,Bn,rB
     ! -----------------------------------
     ! Mass matrix
     ! -----------------------------------
-    call getMassInv(p,detJ,detJ2,qlist,Minv,nelem,nqelem,Ng)
+    call getMassInv(p,detJ,detJ2,w,phi,qlist,Minv,nelem,nqelem,Ng)
 
     ! -----------------------------------
     ! Timestep

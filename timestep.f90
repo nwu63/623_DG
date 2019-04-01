@@ -51,10 +51,11 @@ subroutine timeIntegration(q,p,I2E,B2E,In,Bn,qnrm,Jinv,Jinv2,detJ,detJ2,Minv,xy,
 !f2py intent(in) node,E2N,I2E,B2E,In,Bn,gamma,rBC,Jinv,Minv
 !f2py intent(out) resids, resnorm
 !f2py intent(in,out) q
-    integer :: ielem, iter, iq
+    integer :: ielem, iter
     integer, dimension(3) :: loc
     real(8), dimension(nelem) :: wavespeed
     real(8), dimension(nelem,(p+1)*(p+2)/2,4) :: q1,q2
+    real(8), dimension((p+1)*(p+2)/2,4) :: new_resids
     real(8) :: dt
     resnorm(:) = -1 ! set to high value to allow first pass of while loop
     
@@ -68,10 +69,9 @@ subroutine timeIntegration(q,p,I2E,B2E,In,Bn,qnrm,Jinv,Jinv2,detJ,detJ2,Minv,xy,
         endif
         
         do ielem = 1,nelem
+            call applyMatRes(Minv(ielem,:,:),resids(ielem,:,:),new_resids,p)
             dt = CFL*detJ(ielem)/wavespeed(ielem) ! we let detJ = 2*area
-            do iq = 1,4
-                q1(ielem,:,iq) = q(ielem,:,iq) - dt*matmul(Minv(ielem,:,:),resids(ielem,:,iq)) ! the area term cancels with the dt expression
-            enddo
+            q1(ielem,:,:) = q(ielem,:,:) - dt*new_resids ! the area term cancels with the dt expression
         enddo
         if (p == 0) then 
             q = q1
@@ -79,29 +79,25 @@ subroutine timeIntegration(q,p,I2E,B2E,In,Bn,qnrm,Jinv,Jinv2,detJ,detJ2,Minv,xy,
             call getResidual(q1,p,I2E,B2E,In,Bn,qnrm,rBC,resids,Jinv,Jinv2,detJ,detJ2,xy,w,gphi,w1,&
                 phiL,phiR,xyL,xyR,qlist,wavespeed,gamma,Rgas,nelem,niface,nbface,nqelem,Ng,Ng1)
             do ielem = 1,nelem
+                call applyMatRes(Minv(ielem,:,:),resids(ielem,:,:),new_resids,p)
                 dt = CFL*detJ(ielem)/wavespeed(ielem)
-                do iq = 1,4
-                    q(ielem,:,iq) = 0.5d0*(q(ielem,:,iq) + q1(ielem,:,iq) - dt*matmul(Minv(ielem,:,:),resids(ielem,:,iq)))
-                enddo
+                q(ielem,:,:) = 0.5d0*(q(ielem,:,:) + q1(ielem,:,:) - dt*new_resids)
             enddo
         elseif (p == 2) then
             call getResidual(q1,p,I2E,B2E,In,Bn,qnrm,rBC,resids,Jinv,Jinv2,detJ,detJ2,xy,w,gphi,w1,&
                 phiL,phiR,xyL,xyR,qlist,wavespeed,gamma,Rgas,nelem,niface,nbface,nqelem,Ng,Ng1)
             do ielem = 1,nelem
+                call applyMatRes(Minv(ielem,:,:),resids(ielem,:,:),new_resids,p)
                 dt = CFL*detJ(ielem)/wavespeed(ielem)
-                do iq = 1,4
-                    q2(ielem,:,iq) = 0.25d0*(3.d0*q(ielem,:,iq) + q1(ielem,:,iq) - dt*matmul(Minv(ielem,:,:),resids(ielem,:,iq)))
-                enddo
+                q2(ielem,:,:) = 0.25d0*(3.d0*q(ielem,:,:) + q1(ielem,:,:) - dt*new_resids)
             enddo
             call getResidual(q2,p,I2E,B2E,In,Bn,qnrm,rBC,resids,Jinv,Jinv2,detJ,detJ2,xy,w,gphi,w1,&
                 phiL,phiR,xyL,xyR,qlist,wavespeed,gamma,Rgas,nelem,niface,nbface,nqelem,Ng,Ng1)
             
             do ielem = 1,nelem
+                call applyMatRes(Minv(ielem,:,:),resids(ielem,:,:),new_resids,p)
                 dt = CFL*detJ(ielem)/wavespeed(ielem)
-                do iq = 1,4
-                    q(ielem,:,iq) = 1.d0/3.d0*(q(ielem,:,iq) + 2.d0*q2(ielem,:,iq) &
-                    - 2.d0*dt*matmul(Minv(ielem,:,:),resids(ielem,:,iq)))
-                enddo
+                q(ielem,:,:) = 1.d0/3.d0*(q(ielem,:,:) + 2.d0*q2(ielem,:,:) - 2.d0*dt*new_resids)
             enddo
         endif
         if ((iter > min_iter .and. resnorm(iter) < convtol) .or. resnorm(iter) /= resnorm(iter)) then
@@ -110,3 +106,15 @@ subroutine timeIntegration(q,p,I2E,B2E,In,Bn,qnrm,Jinv,Jinv2,detJ,detJ2,Minv,xy,
     enddo
     print*, "Converged! Took ", iter-1, " iterations to reduce residual to ",resnorm(iter)
 end subroutine timeIntegration
+
+subroutine applyMatRes(Minv,resids,new_resids,p)
+    implicit none
+    integer, intent(in) :: p
+    real(8), intent(in), dimension((p+1)*(p+2)/2,(p+1)*(p+2)/2) :: Minv
+    real(8), intent(in),dimension((p+1)*(p+2)/2,4) :: resids
+    real(8), intent(out),dimension((p+1)*(p+2)/2,4) :: new_resids
+    integer :: Nb
+    Nb = (p+1)*(p+2)/2
+    call dgemm('N','N',Nb,4,Nb,1.d0,Minv,Nb,resids,Nb,0.d0,new_resids,Nb)
+    ! new_resids = matmul(Minv,resids)
+end subroutine applyMatRes

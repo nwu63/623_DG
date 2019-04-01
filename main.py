@@ -90,7 +90,7 @@ if __name__ == '__main__':
     maxiter = 1e5
 
     q,resids,maxres,detJ = dg(q,p,geom,node,qlist,E2N[0],E2N[1],I2E,B2E,In,Bn,rBC,GAMMA,GAS_CONSTANT,CFL,convtol,miniter,maxiter)
-    # print(np.max(np.abs(resids)))
+    # print(np.max(np.abs(resids)));exit()
     # (q,p,geom,resids,maxres,detJ,nodes,qlist,E2N1,E2N2,I2E,B2E,In,Bn,rBC,gamma,Rgas,CFL,convtol,min_iter,&
     # max_iter,nnodes,nelem,niface,nbface,nqelem)
 
@@ -100,7 +100,7 @@ if __name__ == '__main__':
     # print(resids[:,:,1])
     # print(resids[:,:,2])
     # print(resids[:,:,3])
-    print(cl,cd,Es)
+    print(cl,cd,Es);exit()
 
     E2N[0] -= 1
     B2E[0:1] -= 1

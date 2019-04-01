@@ -76,8 +76,7 @@ subroutine getResidual(q,p,I2E,B2E,In,Bn,qnrm,rBC,resids,Jinv,Jinv2,detJ,detJ2,x
         endif
         do ig = 1,Ng
             if (qelem) then ! curved element
-                vec = matmul(gphi(ig,:,:),Jinv2(idx,ig,:,:))
-                ! print*, 'irregu ',abs(1-Jinv2(idx,ig,:,:)/Jinv(elem,:,:))                
+                vec = matmul(gphi(ig,:,:),Jinv2(idx,ig,:,:))             
             else
                 vec = matmul(gphi(ig,:,:),Jinv(elem,:,:))
             endif
@@ -101,7 +100,7 @@ subroutine getResidual(q,p,I2E,B2E,In,Bn,qnrm,rBC,resids,Jinv,Jinv2,detJ,detJ2,x
         elemR = I2E(iface,3)
         faceR = I2E(iface,4)
         call getQ(q(elemL,:,:),p,xyL(faceL,:,:),Ng1,qL)
-        call getQ(q(elemR,:,:),p,xyR(faceR,:,:),Ng1,qR) ! need to reverse the integration order for the other side
+        call getQ(q(elemR,:,:),p,xyR(faceR,:,:),Ng1,qR) 
         do ig = 1,Ng1
             call roeFlux(qL(ig,:),qR(ig,:),F,nrm,gamma,smax)
             do ib = 1,Nb
