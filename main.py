@@ -67,7 +67,7 @@ if __name__ == '__main__':
         E2N = [E2N, np.zeros((1,4))]
         qlist = np.array([])
     elif args.q >= 1:
-        node, E2N, bdy,qlist = readCurvedMesh('../../grid/'+meshFile+'_'+str(args.q)+'_linear')
+        node, E2N, bdy,qlist = readCurvedMesh('../../grid/'+meshFile+'_'+str(args.q))
         
     nelem = E2N[0].shape[0]
     nnode = node.shape[0]

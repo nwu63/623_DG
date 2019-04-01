@@ -83,6 +83,12 @@ subroutine gbasis2D(xy, p, gphi, n_xy)
                 do i_xy = 1,n_xy
                     gphi(i_xy,j,1) = gphi(i_xy,j,1) + r * C(k,j) * xy(i_xy,1)**(r-1) * xy(i_xy,2)**s
                     gphi(i_xy,j,2) = gphi(i_xy,j,2) + s * C(k,j) * xy(i_xy,1)**r * xy(i_xy,2)**(s-1)
+                    if (gphi(i_xy,j,1) /= gphi(i_xy,j,1)) then ! Needed for 0/0 errors? Not really sure
+                        gphi(i_xy,j,1) = 0.d0                  ! TODO: make this more efficient, check at end
+                    endif
+                    if (gphi(i_xy,j,2) /= gphi(i_xy,j,2)) then
+                        gphi(i_xy,j,2) = 0.d0
+                    endif
                 enddo
             enddo
         enddo

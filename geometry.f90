@@ -36,3 +36,17 @@ end subroutine getHOJacobian
 
 ! subroutine getEdgeNrmJac()
 ! end subroutine getEdgeNrmJac
+
+subroutine getdXidSigma(face,vec)
+    implicit none
+    integer, intent(in) :: face
+    real(8), intent(out), dimension(2) :: vec
+
+    if (face == 1) then
+        vec = (/-1.d0,1.d0/)
+    elseif (face == 2) then
+        vec = (/0.d0,-1.d0/)
+    elseif (face == 3) then
+        vec = (/1.d0,0.d0/)
+    endif
+end subroutine getdXidSigma
