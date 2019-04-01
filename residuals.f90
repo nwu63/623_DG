@@ -26,7 +26,7 @@ subroutine getResidual(q,p,I2E,B2E,In,Bn,qnrm,rBC,resids,Jinv,Jinv2,detJ,detJ2,x
     integer, intent(in), dimension(nbface,3) :: B2E
     real(8), intent(in), dimension(niface,3) :: In ! includes length as 3rd component
     real(8), intent(in), dimension(nbface,3) :: Bn ! includes length as 3rd component
-    real(8), intent(in), dimension(nqelem,Ng1,2) :: qnrm ! includes length as 3rd component
+    real(8), intent(in), dimension(nqelem,Ng1,2) :: qnrm ! nrm for high-q elems
     real(8), intent(in), dimension(nelem,2,2) :: Jinv
     real(8), intent(in), dimension(nqelem,Ng,2,2) :: Jinv2
     real(8), intent(in), dimension(nelem) :: detJ
@@ -52,7 +52,7 @@ subroutine getResidual(q,p,I2E,B2E,In,Bn,qnrm,rBC,resids,Jinv,Jinv2,detJ,detJ2,x
     logical :: qelem     ! if the current element is high-q or low-q
     real(8), dimension(:,:), allocatable :: vec, qState, qL, qR
     
-    dirichlet = .true.
+    dirichlet = .false.
     qelem = .false.
     resids(:,:,:) = 0.d0 ! reset resids to zero
     wavespeed(:) = 0.d0

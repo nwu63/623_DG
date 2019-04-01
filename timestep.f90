@@ -2,8 +2,8 @@
 ! TODO: add applyMatRes subroutine
 ! TODO: check iteration counting in print out
 ! TODO: try dgemm instead of matmul
-subroutine timeIntegration(q,p,I2E,B2E,In,Bn,Jinv,detJ,Minv,rBC,resids,resnorm,&
-    gamma,Rgas,CFL,convtol,min_iter,max_iter,nelem,niface,nbface)
+subroutine timeIntegration(q,p,I2E,B2E,In,Bn,qnrm,Jinv,Jinv2,detJ,detJ2,Minv,xy,w,gphi,w1,rBC,resids,&
+    phiL,phiR,xyL,xyR,qlist,resnorm,gamma,Rgas,CFL,convtol,min_iter,max_iter,nelem,niface,nbface,nqelem,Ng,Ng1)
     ! -----------------------------------------------------------------------
     ! Purpose: use forward Euler to timestep the governing equations
     ! 
@@ -25,14 +25,24 @@ subroutine timeIntegration(q,p,I2E,B2E,In,Bn,Jinv,detJ,Minv,rBC,resids,resnorm,&
     ! 
     ! -----------------------------------------------------------------------
     implicit none
-    integer, intent(in) :: nelem,niface,nbface,min_iter,max_iter,p
+    integer, intent(in) :: nelem,niface,nbface,min_iter,max_iter,p,nqelem,Ng,Ng1
     real(8), intent(inout), dimension(nelem,(p+1)*(p+2)/2,4) :: q
     integer, intent(in), dimension(niface,4) :: I2E
     integer, intent(in), dimension(nbface,3) :: B2E
     real(8), intent(in), dimension(niface,3) :: In ! includes length as 3rd component
     real(8), intent(in), dimension(nbface,3) :: Bn ! includes length as 3rd component
+    real(8), intent(in), dimension(nqelem,Ng1,2) :: qnrm ! nrm for high-q elems
     real(8), intent(in), dimension(nelem) :: detJ
+    real(8), intent(in), dimension(nqelem,Ng) :: detJ2
     real(8), intent(in), dimension(nelem,2,2) :: Jinv
+    real(8), intent(in), dimension(nqelem,Ng,2,2) :: Jinv2
+    real(8), intent(in), dimension(Ng,(p+1)*(p+2)/2,2) :: gphi
+    real(8), intent(in), dimension(Ng,2) :: xy
+    real(8), intent(in), dimension(Ng) :: w
+    real(8), intent(in), dimension(Ng1) :: w1
+    real(8), intent(in), dimension(3,Ng1,(p+1)*(p+2)/2) :: phiL,phiR
+    real(8), intent(in), dimension(3,Ng1,2) :: xyL,xyR
+    integer, intent(in), dimension(nqelem) :: qlist
     real(8), intent(in), dimension(nelem,(p+1)*(p+2)/2,(p+1)*(p+2)/2) :: Minv
     real(8), intent(out),dimension(nelem,(p+1)*(p+2)/2,4) :: resids
     real(8), intent(in), dimension(5) :: rBC
@@ -49,7 +59,8 @@ subroutine timeIntegration(q,p,I2E,B2E,In,Bn,Jinv,detJ,Minv,rBC,resids,resnorm,&
     resnorm(:) = -1 ! set to high value to allow first pass of while loop
     
     do iter = 1,max_iter
-        call getResidual(q,p,I2E,B2E,In,Bn,rBC,resids,Jinv,detJ,wavespeed,gamma,Rgas,nelem,niface,nbface)
+        call getResidual(q,p,I2E,B2E,In,Bn,qnrm,rBC,resids,Jinv,Jinv2,detJ,detJ2,xy,w,gphi,w1,&
+            phiL,phiR,xyL,xyR,qlist,wavespeed,gamma,Rgas,nelem,niface,nbface,nqelem,Ng,Ng1)
         resnorm(iter) = maxval(resids)
         loc = maxloc(resids)
         if (mod(iter,100) == 0) then
@@ -65,7 +76,8 @@ subroutine timeIntegration(q,p,I2E,B2E,In,Bn,Jinv,detJ,Minv,rBC,resids,resnorm,&
         if (p == 0) then 
             q = q1
         elseif (p == 1) then
-            call getResidual(q1,p,I2E,B2E,In,Bn,rBC,resids,Jinv,detJ,wavespeed,gamma,Rgas,nelem,niface,nbface)
+            call getResidual(q1,p,I2E,B2E,In,Bn,qnrm,rBC,resids,Jinv,Jinv2,detJ,detJ2,xy,w,gphi,w1,&
+                phiL,phiR,xyL,xyR,qlist,wavespeed,gamma,Rgas,nelem,niface,nbface,nqelem,Ng,Ng1)
             do ielem = 1,nelem
                 dt = CFL*detJ(ielem)/wavespeed(ielem)
                 do iq = 1,4
@@ -73,14 +85,17 @@ subroutine timeIntegration(q,p,I2E,B2E,In,Bn,Jinv,detJ,Minv,rBC,resids,resnorm,&
                 enddo
             enddo
         elseif (p == 2) then
-            call getResidual(q1,p,I2E,B2E,In,Bn,rBC,resids,Jinv,detJ,wavespeed,gamma,Rgas,nelem,niface,nbface)
+            call getResidual(q1,p,I2E,B2E,In,Bn,qnrm,rBC,resids,Jinv,Jinv2,detJ,detJ2,xy,w,gphi,w1,&
+                phiL,phiR,xyL,xyR,qlist,wavespeed,gamma,Rgas,nelem,niface,nbface,nqelem,Ng,Ng1)
             do ielem = 1,nelem
                 dt = CFL*detJ(ielem)/wavespeed(ielem)
                 do iq = 1,4
                     q2(ielem,:,iq) = 0.25d0*(3.d0*q(ielem,:,iq) + q1(ielem,:,iq) - dt*matmul(Minv(ielem,:,:),resids(ielem,:,iq)))
                 enddo
             enddo
-            call getResidual(q2,p,I2E,B2E,In,Bn,rBC,resids,Jinv,detJ,wavespeed,gamma,Rgas,nelem,niface,nbface)
+            call getResidual(q2,p,I2E,B2E,In,Bn,qnrm,rBC,resids,Jinv,Jinv2,detJ,detJ2,xy,w,gphi,w1,&
+                phiL,phiR,xyL,xyR,qlist,wavespeed,gamma,Rgas,nelem,niface,nbface,nqelem,Ng,Ng1)
+            
             do ielem = 1,nelem
                 dt = CFL*detJ(ielem)/wavespeed(ielem)
                 do iq = 1,4

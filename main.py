@@ -63,8 +63,8 @@ if __name__ == '__main__':
     
     I2E, B2E, In, Bn, area = readMeshMatrices('../../grid/'+meshFile+'_mat')
     if args.q == 1:
-        node, E2N, bdy = readMesh('../../grid/'+meshFile)
-        E2N = [E2N, np.zeros((1,4))]
+        node, E2N, bdy = readMesh('../../grid/'+meshFile+'_'+str(args.q))
+        E2N = [E2N, np.zeros((1,3))]
         qlist = np.array([])
     elif args.q >= 1:
         node, E2N, bdy,qlist = readCurvedMesh('../../grid/'+meshFile+'_'+str(args.q))
@@ -90,7 +90,7 @@ if __name__ == '__main__':
     maxiter = 1e5
 
     q,resids,maxres,detJ = dg(q,p,geom,node,qlist,E2N[0],E2N[1],I2E,B2E,In,Bn,rBC,GAMMA,GAS_CONSTANT,CFL,convtol,miniter,maxiter)
-    print(np.max(np.abs(resids)));exit()
+    # print(np.max(np.abs(resids)))
     # (q,p,geom,resids,maxres,detJ,nodes,qlist,E2N1,E2N2,I2E,B2E,In,Bn,rBC,gamma,Rgas,CFL,convtol,min_iter,&
     # max_iter,nnodes,nelem,niface,nbface,nqelem)
 
