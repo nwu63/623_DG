@@ -26,11 +26,11 @@ subroutine getHOJacobian(nodes, geom, xy, J, Jinv, detJ, n_xy)
     real(8), dimension(n_xy,(geom+1)*(geom+2)/2,2) :: gphi
     integer :: ig
 
-    call gbasis2D(xy, geom, gphi, 1)
+    call gbasis2D(xy, geom, gphi, n_xy)
     do ig = 1,n_xy
-        J(ig,:,:) = matmul(transpose(nodes(:,:)),gphi(ig,:,:))
+        J(ig,:,:) = matmul(transpose(nodes),gphi(ig,:,:))
         detJ(ig) = J(ig,1,1) * J(ig,2,2) - J(ig,2,1) * J(ig,1,2)
-        call matInv(2,J,Jinv(ig,:,:))
+        call matInv(2,J(ig,:,:),Jinv(ig,:,:))
     enddo
 end subroutine getHOJacobian
 

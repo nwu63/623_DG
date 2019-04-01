@@ -1,5 +1,6 @@
 ! TODO: have precomputation/evaluation of quadratures in DG
-subroutine getResidual(q,p,I2E,B2E,In,Bn,rBC,resids,Jinv,detJ,wavespeed,gamma,Rgas,nelem,niface,nbface)
+subroutine getResidual(q,p,I2E,B2E,In,Bn,rBC,resids,Jinv,Jinv2,detJ,detJ2,xy,w2,gphi,qlist,wavespeed,gamma,Rgas,&
+    nelem,niface,nbface,nqelem,Ng)
     ! -----------------------------------------------------------------------
     ! Purpose: Calculates the residual over the entire domain
     ! 
@@ -19,45 +20,44 @@ subroutine getResidual(q,p,I2E,B2E,In,Bn,rBC,resids,Jinv,detJ,wavespeed,gamma,Rg
     ! 
     ! -----------------------------------------------------------------------
     implicit none
-    integer, intent(in) :: nelem,niface,nbface,p
+    integer, intent(in) :: nelem,niface,nbface,p,nqelem,Ng
     real(8), intent(in), dimension(nelem,(p+1)*(p+2)/2,4) :: q
     integer, intent(in), dimension(niface,4) :: I2E
     integer, intent(in), dimension(nbface,3) :: B2E
     real(8), intent(in), dimension(niface,3) :: In ! includes length as 3rd component
     real(8), intent(in), dimension(nbface,3) :: Bn ! includes length as 3rd component
     real(8), intent(in), dimension(nelem,2,2) :: Jinv
+    real(8), intent(in), dimension(nqelem,Ng,2,2) :: Jinv2
     real(8), intent(in), dimension(nelem) :: detJ
+    real(8), intent(in), dimension(nqelem,Ng) :: detJ2
+    real(8), intent(in), dimension(Ng,(p+1)*(p+2)/2,2) :: gphi
+    real(8), intent(in), dimension(Ng,2) :: xy
+    real(8), intent(in), dimension(Ng) :: w2
+    integer, intent(in), dimension(nqelem) :: qlist
     real(8), intent(in), dimension(5) :: rBC
     real(8), intent(in) :: gamma, Rgas
     real(8), intent(out), dimension(nelem,(p+1)*(p+2)/2,4) :: resids
     real(8), intent(out), dimension(nelem) :: wavespeed ! this is in fact the sum of length*wavespeed for each cell
 !f2py intent(in) q,I2E,B2E,In,Bn,rBC,gamma, Rgas, Jinv, detJ
 !f2py intent(out) resids,wavespeed
-    integer :: iface, elemL,elemR,faceL,faceR,elem,btype,face,Nb,Ng,ig,ib,g1,Ng1,g
+    integer :: iface, elemL,elemR,faceL,faceR,elem,btype,face,Nb,ig,ib,g1,Ng1,g,idx
     real(8), dimension(2) :: nrm
     real(8), dimension(4) :: F,qBC,qI
     real(8) :: length,pinf,Mb,rhoinf,Tt,pt,alpha,Tb,pb,cb,Splus,Jplus,uI,vI,unb,unplus,cplus,pplus,ub,vb,dn,a,b,c,det,smax
     logical :: dirichlet ! sets all BC to Dirichlet equal to qBC
-    real(8), dimension(:,:,:), allocatable :: gphi, xyL, phiL,xyR, phiR ! xy1 is the edge integration points on T
-    real(8), dimension(:,:), allocatable :: xy, vec, qState, qL, qR
-    real(8), dimension(:), allocatable :: w1,w2,x
+    real(8), dimension(:,:,:), allocatable :: xyL, phiL,xyR, phiR ! xy1 is the edge integration points on T
+    real(8), dimension(:,:), allocatable :: vec, qState, qL, qR
+    real(8), dimension(:), allocatable :: w1,x
     
-    dirichlet = .false.
+    dirichlet = .true.
     resids(:,:,:) = 0.d0 ! reset resids to zero
     wavespeed(:) = 0.d0
     ! -----------------------------------
     ! Pre-compute quantities
     ! -----------------------------------
     Nb = (p+1)*(p+2)/2
-    g = 2*p+1
-    call Gauss2D_pre(g,Ng)
-    allocate(xy(Ng,2))
-    allocate(w2(Ng))
-    allocate(gphi(Ng,Nb,2))
     allocate(vec(Nb,2))
     allocate(qState(Ng,4))
-    call Gauss2D(g,Ng,xy,w2)
-    call gbasis2D(xy, p, gphi, Ng)
     
     g1 = 2*p+1
     Ng1 = (g1+2)/2
@@ -89,10 +89,20 @@ subroutine getResidual(q,p,I2E,B2E,In,Bn,rBC,resids,Jinv,detJ,wavespeed,gamma,Rg
     do elem = 1,nelem
         call getQ(q(elem,:,:),p,xy,Ng,qState)
         do ig = 1,Ng
-            vec = matmul(gphi(ig,:,:),Jinv(elem,:,:))
+            if (any(qlist == elem)) then ! curved element
+                idx = minloc((qlist-elem)**2,dim=1)
+                vec = matmul(gphi(ig,:,:),Jinv2(idx,ig,:,:))
+                ! print*, 'irregu ',abs(1-Jinv2(idx,ig,:,:)/Jinv(elem,:,:))                
+            else
+                vec = matmul(gphi(ig,:,:),Jinv(elem,:,:))
+            endif
             do ib = 1,Nb
                 call eulerFlux(qState(ig,:),F,vec(ib,:),gamma,smax) ! TODO: we actually only need to get F as 4x2 once
-                resids(elem,ib,:) = resids(elem,ib,:) - norm2(vec(ib,:))*F(:)*detJ(elem)*w2(ig)
+                if (any(qlist == elem)) then ! curved element
+                    resids(elem,ib,:) = resids(elem,ib,:) - norm2(vec(ib,:))*F(:)*detJ2(idx,ig)*w2(ig)
+                else
+                    resids(elem,ib,:) = resids(elem,ib,:) - norm2(vec(ib,:))*F(:)*detJ(elem)*w2(ig)
+                endif
             enddo
         enddo
     enddo
@@ -109,7 +119,6 @@ subroutine getResidual(q,p,I2E,B2E,In,Bn,rBC,resids,Jinv,detJ,wavespeed,gamma,Rg
         call getQ(q(elemR,:,:),p,xyR(faceR,:,:),Ng1,qR) ! need to reverse the integration order for the other side
         do ig = 1,Ng1
             call roeFlux(qL(ig,:),qR(ig,:),F,nrm,gamma,smax)
-            ! print*, F
             do ib = 1,Nb
                 resids(elemL,ib,:) = resids(elemL,ib,:) + phiL(faceL,ig,ib)*F(:)*length*w1(ig)
                 resids(elemR,ib,:) = resids(elemR,ib,:) - phiR(faceR,ig,ib)*F(:)*length*w1(Ng1-ig+1) ! apply weights in reverse
@@ -118,7 +127,6 @@ subroutine getResidual(q,p,I2E,B2E,In,Bn,rBC,resids,Jinv,detJ,wavespeed,gamma,Rg
             wavespeed(elemR) = wavespeed(elemR) + smax*length * w1(Ng1-ig+1)
         enddo
     enddo
-    ! print*, resids
     ! -------------------- unpack rBC
     pinf = rBC(1)
     rhoinf = rBC(2)

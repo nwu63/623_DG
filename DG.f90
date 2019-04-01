@@ -27,9 +27,10 @@ subroutine DG(q,p,geom,resids,maxres,detJ,nodes,qlist,E2N1,E2N2,I2E,B2E,In,Bn,rB
     real(8), dimension(:,:,:), allocatable :: Minv, gphi
     real(8), dimension(:,:), allocatable :: xy,phi, detJ2
     real(8), dimension(:), allocatable :: w
+    real(8), dimension(nelem) :: wavespeed
     
     ! -----------------------------------
-    ! Define constants and allocate arrays
+    ! Allocate and precompute basis values at integration points
     ! -----------------------------------
     Nb = (p+1)*(p+2)/2
     allocate(Minv(nelem,Nb,Nb))
@@ -52,21 +53,22 @@ subroutine DG(q,p,geom,resids,maxres,detJ,nodes,qlist,E2N1,E2N2,I2E,B2E,In,Bn,rB
     
     do ielem = 1,nelem
         call getJacobian(nodes(E2N1(ielem,:),:), J(ielem,:,:), Jinv(ielem,:,:), detJ(ielem))
-        print*, ielem
         if (any(qlist == ielem)) then ! curved element
             idx = minloc((qlist-ielem)**2,dim=1)
             call getHOJacobian(nodes(E2N2(idx,:),:), geom, xy, J2(idx,:,:,:), Jinv2(idx,:,:,:), detJ2(idx,:),Ng)
         endif
     enddo
     call getMassInv(p,detJ,detJ2,qlist,Minv,nelem,nqelem,Ng)
+
+
     
     ! -----------------------------------
     ! Timestep
     ! -----------------------------------
     
-    call timeIntegration(q,p,I2E,B2E,In,Bn,Jinv,detJ,Minv,rBC,resids,maxres,&
-    gamma,Rgas,CFL,convtol,min_iter,max_iter,nelem,niface,nbface)
+    ! call timeIntegration(q,p,I2E,B2E,In,Bn,Jinv,detJ,Minv,rBC,resids,maxres,&
+    ! gamma,Rgas,CFL,convtol,min_iter,max_iter,nelem,niface,nbface)
 
-
-    ! call getResidual(q,p,I2E,B2E,In,Bn,rBC,resids,Jinv,detJ,wavespeed,gamma,Rgas,nelem,niface,nbface)
+    call getResidual(q,p,I2E,B2E,In,Bn,rBC,resids,Jinv,Jinv2,detJ,detJ2,xy,w,gphi,qlist,wavespeed,gamma,Rgas,&
+    nelem,niface,nbface,nqelem,Ng)
 end subroutine DG
