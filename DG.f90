@@ -1,4 +1,5 @@
-subroutine DG(q,p,geom,resids,maxres,detJ,nodes,qlist,E2N1,E2N2,I2E,B2E,In,Bn,rBC,gamma,Rgas,CFL,convtol,min_iter,&
+! TODO: update detJ for area with nonlinear elements
+subroutine DG(q,p,geom,resids,maxres,nodes,qlist,E2N1,E2N2,I2E,B2E,In,Bn,rBC,gamma,Rgas,CFL,convtol,min_iter,&
     max_iter,nnodes,nelem,niface,nbface,nqelem)
     implicit none
     integer, intent(in) :: p,nnodes,nelem,niface,nbface,min_iter,max_iter,nqelem,geom
@@ -15,16 +16,16 @@ subroutine DG(q,p,geom,resids,maxres,detJ,nodes,qlist,E2N1,E2N2,I2E,B2E,In,Bn,rB
     real(8), intent(in), dimension(5) :: rBC
     real(8), intent(in) :: gamma, Rgas, convtol, CFL
     real(8), intent(out), dimension(max_iter) :: maxres
-    real(8), dimension(nelem),intent(out) :: detJ
 !f2py intent(in) node,E2N1,E2N2,I2E,B2E,In,Bn,gamma,rBC,qlist
 !f2py intent(out) resids, maxres, detJ
 !f2py intent(in,out) q
     integer :: ielem, Nb, Ng, g, idx, g1, Ng1,iface,face,ig
     real(8) :: temp2
+    real(8), dimension(nelem) :: detJ
     real(8), dimension(nelem,2,2) :: J, Jinv
     real(8), dimension(:,:,:,:), allocatable :: J2, Jinv2
     real(8), dimension(:,:,:), allocatable :: Minv, gphi, xyL, phiL,xyR, phiR,qnrm ! xy1 is the edge integration points on T
-    real(8), dimension(:,:), allocatable :: xy,phi, detJ2, qlength
+    real(8), dimension(:,:), allocatable :: xy,phi, detJ2
     real(8), dimension(:), allocatable :: w,x,w1
     ! real(8), dimension(nelem) :: wavespeed
     real(8), dimension(2,2) :: temp1,Jedge
@@ -86,13 +87,13 @@ subroutine DG(q,p,geom,resids,maxres,detJ,nodes,qlist,E2N1,E2N2,I2E,B2E,In,Bn,rB
         if (any(qlist == ielem)) then ! curved element
             idx = minloc((qlist-ielem)**2,dim=1)
             call getHOJacobian(nodes(E2N2(idx,:),:), geom, xy, J2(idx,:,:,:), Jinv2(idx,:,:,:), detJ2(idx,:),Ng)
+            detJ(ielem) = dot_product(detJ2(idx,:),w(:))*2 ! We multiply by 2 so it's the same as detJ = 2*area
         endif
     enddo
     ! -----------------------------------
     ! Normals and Edge Jacobians
     ! -----------------------------------
     allocate(qnrm(nqelem,Ng1,2))
-    allocate(qlength(nqelem,Ng1))
     do iface = 1, nbface
         ielem = B2E(iface,1)
         face = B2E(iface,2)
@@ -117,8 +118,8 @@ subroutine DG(q,p,geom,resids,maxres,detJ,nodes,qlist,E2N1,E2N2,I2E,B2E,In,Bn,rB
     ! Timestep
     ! -----------------------------------
     
-    call timeIntegration(q,p,I2E,B2E,In,Bn,qnrm,Jinv,Jinv2,detJ,detJ2,Minv,xy,w,gphi,w1,rBC,resids,&
-    phiL,phiR,xyL,xyR,qlist,maxres,gamma,Rgas,CFL,convtol,min_iter,max_iter,nelem,niface,nbface,nqelem,Ng,Ng1)
+    call timeIntegration(q,p,I2E,B2E,In,Bn,qnrm,Jinv,Jinv2,detJ,detJ2,Minv,w,phi,gphi,w1,rBC,resids,&
+    phiL,phiR,qlist,maxres,gamma,Rgas,CFL,convtol,min_iter,max_iter,nelem,niface,nbface,nqelem,Ng,Ng1)
 
     ! call getResidual(q,p,I2E,B2E,In,Bn,qnrm,rBC,resids,Jinv,Jinv2,detJ,detJ2,xy,w,gphi,w1,&
     ! phiL,phiR,xyL,xyR,qlist,wavespeed,gamma,Rgas,nelem,niface,nbface,nqelem,Ng,Ng1)

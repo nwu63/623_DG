@@ -2,8 +2,8 @@
 ! TODO: add applyMatRes subroutine
 ! TODO: check iteration counting in print out
 ! TODO: try dgemm instead of matmul
-subroutine timeIntegration(q,p,I2E,B2E,In,Bn,qnrm,Jinv,Jinv2,detJ,detJ2,Minv,xy,w,gphi,w1,rBC,resids,&
-    phiL,phiR,xyL,xyR,qlist,resnorm,gamma,Rgas,CFL,convtol,min_iter,max_iter,nelem,niface,nbface,nqelem,Ng,Ng1)
+subroutine timeIntegration(q,p,I2E,B2E,In,Bn,qnrm,Jinv,Jinv2,detJ,detJ2,Minv,w,phi,gphi,w1,rBC,resids,&
+    phiL,phiR,qlist,resnorm,gamma,Rgas,CFL,convtol,min_iter,max_iter,nelem,niface,nbface,nqelem,Ng,Ng1)
     ! -----------------------------------------------------------------------
     ! Purpose: use forward Euler to timestep the governing equations
     ! 
@@ -36,12 +36,11 @@ subroutine timeIntegration(q,p,I2E,B2E,In,Bn,qnrm,Jinv,Jinv2,detJ,detJ2,Minv,xy,
     real(8), intent(in), dimension(nqelem,Ng) :: detJ2
     real(8), intent(in), dimension(nelem,2,2) :: Jinv
     real(8), intent(in), dimension(nqelem,Ng,2,2) :: Jinv2
+    real(8), intent(in), dimension(Ng,(p+1)*(p+2)/2) :: phi
     real(8), intent(in), dimension(Ng,(p+1)*(p+2)/2,2) :: gphi
-    real(8), intent(in), dimension(Ng,2) :: xy
     real(8), intent(in), dimension(Ng) :: w
     real(8), intent(in), dimension(Ng1) :: w1
     real(8), intent(in), dimension(3,Ng1,(p+1)*(p+2)/2) :: phiL,phiR
-    real(8), intent(in), dimension(3,Ng1,2) :: xyL,xyR
     integer, intent(in), dimension(nqelem) :: qlist
     real(8), intent(in), dimension(nelem,(p+1)*(p+2)/2,(p+1)*(p+2)/2) :: Minv
     real(8), intent(out),dimension(nelem,(p+1)*(p+2)/2,4) :: resids
@@ -60,10 +59,15 @@ subroutine timeIntegration(q,p,I2E,B2E,In,Bn,qnrm,Jinv,Jinv2,detJ,detJ2,Minv,xy,
     resnorm(:) = -1 ! set to high value to allow first pass of while loop
     
     do iter = 1,max_iter
-        call getResidual(q,p,I2E,B2E,In,Bn,qnrm,rBC,resids,Jinv,Jinv2,detJ,detJ2,xy,w,gphi,w1,&
-            phiL,phiR,xyL,xyR,qlist,wavespeed,gamma,Rgas,nelem,niface,nbface,nqelem,Ng,Ng1)
+        call getResidual(q,p,I2E,B2E,In,Bn,qnrm,rBC,resids,Jinv,Jinv2,detJ,detJ2,w,phi,gphi,w1,&
+            phiL,phiR,qlist,wavespeed,gamma,Rgas,nelem,niface,nbface,nqelem,Ng,Ng1)
         resnorm(iter) = maxval(resids)
         loc = maxloc(resids)
+        if (mod(iter,2000) == 0 .or. iter == 1) then
+            print*, "    ---------------------------------------------------------------------"
+            print*, "       iter          maximum residual     element       basis           q"
+            print*, "    ---------------------------------------------------------------------"
+        endif
         if (mod(iter,100) == 0) then
             print*, iter, resnorm(iter), loc(1), loc(2), loc(3)
         endif
@@ -76,23 +80,23 @@ subroutine timeIntegration(q,p,I2E,B2E,In,Bn,qnrm,Jinv,Jinv2,detJ,detJ2,Minv,xy,
         if (p == 0) then 
             q = q1
         elseif (p == 1) then
-            call getResidual(q1,p,I2E,B2E,In,Bn,qnrm,rBC,resids,Jinv,Jinv2,detJ,detJ2,xy,w,gphi,w1,&
-                phiL,phiR,xyL,xyR,qlist,wavespeed,gamma,Rgas,nelem,niface,nbface,nqelem,Ng,Ng1)
+            call getResidual(q1,p,I2E,B2E,In,Bn,qnrm,rBC,resids,Jinv,Jinv2,detJ,detJ2,w,phi,gphi,w1,&
+                phiL,phiR,qlist,wavespeed,gamma,Rgas,nelem,niface,nbface,nqelem,Ng,Ng1)
             do ielem = 1,nelem
                 call applyMatRes(Minv(ielem,:,:),resids(ielem,:,:),new_resids,p)
                 dt = CFL*detJ(ielem)/wavespeed(ielem)
                 q(ielem,:,:) = 0.5d0*(q(ielem,:,:) + q1(ielem,:,:) - dt*new_resids)
             enddo
         elseif (p == 2) then
-            call getResidual(q1,p,I2E,B2E,In,Bn,qnrm,rBC,resids,Jinv,Jinv2,detJ,detJ2,xy,w,gphi,w1,&
-                phiL,phiR,xyL,xyR,qlist,wavespeed,gamma,Rgas,nelem,niface,nbface,nqelem,Ng,Ng1)
+            call getResidual(q1,p,I2E,B2E,In,Bn,qnrm,rBC,resids,Jinv,Jinv2,detJ,detJ2,w,phi,gphi,w1,&
+                phiL,phiR,qlist,wavespeed,gamma,Rgas,nelem,niface,nbface,nqelem,Ng,Ng1)
             do ielem = 1,nelem
                 call applyMatRes(Minv(ielem,:,:),resids(ielem,:,:),new_resids,p)
                 dt = CFL*detJ(ielem)/wavespeed(ielem)
                 q2(ielem,:,:) = 0.25d0*(3.d0*q(ielem,:,:) + q1(ielem,:,:) - dt*new_resids)
             enddo
-            call getResidual(q2,p,I2E,B2E,In,Bn,qnrm,rBC,resids,Jinv,Jinv2,detJ,detJ2,xy,w,gphi,w1,&
-                phiL,phiR,xyL,xyR,qlist,wavespeed,gamma,Rgas,nelem,niface,nbface,nqelem,Ng,Ng1)
+            call getResidual(q2,p,I2E,B2E,In,Bn,qnrm,rBC,resids,Jinv,Jinv2,detJ,detJ2,w,phi,gphi,w1,&
+                phiL,phiR,qlist,wavespeed,gamma,Rgas,nelem,niface,nbface,nqelem,Ng,Ng1)
             
             do ielem = 1,nelem
                 call applyMatRes(Minv(ielem,:,:),resids(ielem,:,:),new_resids,p)
@@ -104,7 +108,7 @@ subroutine timeIntegration(q,p,I2E,B2E,In,Bn,qnrm,Jinv,Jinv2,detJ,detJ2,Minv,xy,
             exit
         endif
     enddo
-    print*, "Converged! Took ", iter-1, " iterations to reduce residual to ",resnorm(iter)
+    print*, "Converged! Took ", iter-1, " iterations to reduce residual to ",resnorm(iter-1)
 end subroutine timeIntegration
 
 subroutine applyMatRes(Minv,resids,new_resids,p)

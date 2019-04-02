@@ -84,8 +84,8 @@ def readMeshMatrices(fname):
 
     return I2E, B2E, In, Bn, Area
 
-def writeSolution(filename,q,grad,resids,resnorm,time,cl,cd,Es,cp,mach):
-    np.savez(filename,q=q,grad=grad,resids=resids,resnorm=resnorm,time=time,cl=cl,cd=cd,Es=Es,cp=cp,mach=mach)
+def writeSolution(filename,q,p,geom,resids,resnorm,time,cl,cd,Es,cp,mach):
+    np.savez(filename,q=q,p=p,geom=geom,resids=resids,resnorm=resnorm,time=time,cl=cl,cd=cd,Es=Es,cp=cp,mach=mach)
 
 
 def readSolution(filename):

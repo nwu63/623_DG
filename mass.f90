@@ -32,7 +32,7 @@ subroutine getHORefMassMatrix(p,w,phi,detJ2,M,Ng)
     real(8), intent(out), dimension((p+1)*(p+2)/2,(p+1)*(p+2)/2) :: M
 !f2py intent(in) p
 !f2py intent(out) M
-    integer :: Nb, i,g
+    integer :: Nb, i
     real(8), dimension(:,:), allocatable :: wmat
 
     Nb = (p+1)*(p+2)/2

@@ -1,6 +1,6 @@
 ! TODO: have precomputation/evaluation of quadratures in DG
-subroutine getResidual(q,p,I2E,B2E,In,Bn,qnrm,rBC,resids,Jinv,Jinv2,detJ,detJ2,xy,w2,gphi,&
-    w1,phiL,phiR,xyL,xyR,qlist,wavespeed,gamma,Rgas,nelem,niface,nbface,nqelem,Ng,Ng1)
+subroutine getResidual(q,p,I2E,B2E,In,Bn,qnrm,rBC,resids,Jinv,Jinv2,detJ,detJ2,w2,phi,gphi,&
+    w1,phiL,phiR,qlist,wavespeed,gamma,Rgas,nelem,niface,nbface,nqelem,Ng,Ng1)
     ! -----------------------------------------------------------------------
     ! Purpose: Calculates the residual over the entire domain
     ! 
@@ -31,20 +31,19 @@ subroutine getResidual(q,p,I2E,B2E,In,Bn,qnrm,rBC,resids,Jinv,Jinv2,detJ,detJ2,x
     real(8), intent(in), dimension(nqelem,Ng,2,2) :: Jinv2
     real(8), intent(in), dimension(nelem) :: detJ
     real(8), intent(in), dimension(nqelem,Ng) :: detJ2
+    real(8), intent(in), dimension(Ng,(p+1)*(p+2)/2) :: phi
     real(8), intent(in), dimension(Ng,(p+1)*(p+2)/2,2) :: gphi
-    real(8), intent(in), dimension(Ng,2) :: xy
     real(8), intent(in), dimension(Ng) :: w2
     real(8), intent(in), dimension(Ng1) :: w1
     real(8), intent(in), dimension(3,Ng1,(p+1)*(p+2)/2) :: phiL,phiR
-    real(8), intent(in), dimension(3,Ng1,2) :: xyL,xyR
     integer, intent(in), dimension(nqelem) :: qlist
     real(8), intent(in), dimension(5) :: rBC
     real(8), intent(in) :: gamma, Rgas
     real(8), intent(out), dimension(nelem,(p+1)*(p+2)/2,4) :: resids
     real(8), intent(out), dimension(nelem) :: wavespeed ! this is in fact the sum of length*wavespeed for each cell
-!f2py intent(in) q,I2E,B2E,In,Bn,rBC,gamma, Rgas, Jinv, detJ,xy,w2,gphi,xyL,xyR,phiL,phiR
+!f2py intent(in) q,I2E,B2E,In,Bn,rBC,gamma, Rgas, Jinv, detJ,w2,gphi,phiL,phiR
 !f2py intent(out) resids,wavespeed
-    integer :: iface, elemL,elemR,faceL,faceR,elem,btype,face,Nb,ig,ib,g1,g,idx
+    integer :: iface, elemL,elemR,faceL,faceR,elem,btype,face,Nb,ig,ib,idx
     real(8), dimension(2) :: nrm
     real(8), dimension(4) :: F,qBC,qI
     real(8) :: length,pinf,Mb,rhoinf,Tt,pt,alpha,Tb,pb,cb,Splus,Jplus,uI,vI,unb,unplus,cplus,pplus,ub,vb,dn,a,b,c,det,smax
@@ -64,10 +63,10 @@ subroutine getResidual(q,p,I2E,B2E,In,Bn,qnrm,rBC,resids,Jinv,Jinv2,detJ,detJ2,x
     allocate(qState(Ng,4))
     allocate(qL(Ng1,4))
     allocate(qR(Ng1,4))
-
+    idx = 0
     ! ------------------- interior element contribution
     do elem = 1,nelem
-        call getQ(q(elem,:,:),p,xy,Ng,qState)
+        call getQ(q(elem,:,:),p,phi,Ng,qState)
         if (any(qlist == elem)) then ! curved element
             qelem = .true.
             idx = minloc((qlist-elem)**2,dim=1)
@@ -99,8 +98,8 @@ subroutine getResidual(q,p,I2E,B2E,In,Bn,qnrm,rBC,resids,Jinv,Jinv2,detJ,detJ2,x
         faceL = I2E(iface,2)
         elemR = I2E(iface,3)
         faceR = I2E(iface,4)
-        call getQ(q(elemL,:,:),p,xyL(faceL,:,:),Ng1,qL)
-        call getQ(q(elemR,:,:),p,xyR(faceR,:,:),Ng1,qR) 
+        call getQ(q(elemL,:,:),p,phiL(faceL,:,:),Ng1,qL)
+        call getQ(q(elemR,:,:),p,phiR(faceR,:,:),Ng1,qR) 
         do ig = 1,Ng1
             call roeFlux(qL(ig,:),qR(ig,:),F,nrm,gamma,smax)
             do ib = 1,Nb
@@ -136,7 +135,7 @@ subroutine getResidual(q,p,I2E,B2E,In,Bn,qnrm,rBC,resids,Jinv,Jinv2,detJ,detJ2,x
                 length = norm2(qnrm(idx,ig,:))
                 nrm = qnrm(idx,ig,:)/length
             endif
-            call getQ(q(elem,:,:),p,xyL(face,ig,:),1,qI) ! we evaluate these one at a time to simplify code
+            call getQ(q(elem,:,:),p,phiL(face,ig,:),1,qI) ! TODO: evaluate all at once
             uI = qI(2)/qI(1) ! internal velocity components
             vI = qI(3)/qI(1)
             unplus = uI*nrm(1) + vI*nrm(2) ! internal projected velocity
@@ -153,7 +152,7 @@ subroutine getResidual(q,p,I2E,B2E,In,Bn,qnrm,rBC,resids,Jinv,Jinv2,detJ,detJ2,x
                 F(3) = pb*nrm(2)
                 F(4) = 0.d0
                 ! should you zero out smax here?
-                ! smax = 0.d0
+                smax = 0.d0
             else if (btype == 1) then ! INLET BC
                 dn = cos(alpha)*nrm(1) + sin(alpha)*nrm(2)
                 pplus = (gamma-1.d0)*(qI(4) - 0.5d0*qI(1)*(uI**2+vI**2))
@@ -203,7 +202,7 @@ subroutine getResidual(q,p,I2E,B2E,In,Bn,qnrm,rBC,resids,Jinv,Jinv2,detJ,detJ2,x
     enddo ! iface
 end subroutine getResidual
 
-subroutine getQ(q,p,xy,n_xy,qState)
+subroutine getQ(q,p,phi,n_xy,qState)
     ! -----------------------------------------------------------------------
     ! Purpose: Evaluates the state qState, given by the coefficients
     !          q on a triangular element with Lagrange basis functions
@@ -219,18 +218,14 @@ subroutine getQ(q,p,xy,n_xy,qState)
     ! -----------------------------------------------------------------------
     implicit none
     integer, intent(in) :: p,n_xy
-    real(8), intent(in), dimension(n_xy,2) :: xy
     real(8), intent(in), dimension((p+1)*(p+2)/2,4) :: q
+    real(8), dimension(n_xy,(p+1)*(p+2)/2) :: phi
     real(8), intent(out), dimension(n_xy,4) :: qState
 !f2py intent(in) p,q
 !f2py intent(out) qState
-    real(8), dimension(n_xy,(p+1)*(p+2)/2) :: phi
-
-    call basis2D(xy, p, phi, n_xy)
+    
     qState = matmul(phi,q)
 end subroutine getQ
-
-
 
 subroutine getIC(rBC,q,gamma)
     ! -----------------------------------------------------------------------
