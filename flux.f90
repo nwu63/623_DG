@@ -1,3 +1,41 @@
+subroutine eulerFluxVec(q,F,gamma)
+    ! -----------------------------------------------------------------------
+    ! Purpose: Calculates the analytical Euler flux given a state and normal
+    ! 
+    ! Inputs:
+    !   q[4] = the state
+    !   nrm[2] = the normal vector
+    !   gamma = heat ratio
+    ! 
+    ! Outs:
+    !   F[4] = analytical Euler flux
+    ! 
+    ! -----------------------------------------------------------------------
+    implicit none
+    real(8), intent(in), dimension(0:3) :: q
+    real(8), intent(in) :: gamma
+    real(8), intent(out), dimension(0:3,0:1) :: F
+!f2py intent(in) q, nrm,gamma
+!f2py intent(out) F
+    real(8) :: velnorm,p,H
+
+
+    velnorm = sqrt((q(1)/q(0))**2.d0 + (q(2)/q(0))**2.d0) ! this is the norm of velocity vector
+    p = (gamma-1)*(q(3) - 0.5d0*q(0)*velnorm**2.d0)
+    H = q(3)/q(0) + p/q(0)
+    ! ---------- F1 and F2 are the fluxes in the x and y directions
+    F(0,0) = q(1)
+    F(1,0) = q(1)**2.d0/q(0) + p
+    F(2,0) = q(1)*q(2)/q(0)
+    F(3,0) = q(1)*H
+
+    F(0,1) = q(2)
+    F(1,1) = q(1)*q(2)/q(0)
+    F(2,1) = q(2)**2.d0/q(0) + p
+    F(3,1) = q(2)*H
+end subroutine eulerFluxVec
+
+
 subroutine eulerFlux(q,F,vec,gamma,smax)
     ! -----------------------------------------------------------------------
     ! Purpose: Calculates the analytical Euler flux given a state and normal

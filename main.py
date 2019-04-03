@@ -70,7 +70,6 @@ if __name__ == '__main__':
 
     I2E, B2E, In, Bn, area = readMeshMatrices('../../grid/'+meshFile+'_mat')
     if geom == 1:
-        # node, E2N, bdy = readMesh('../../grid/'+meshFile+'_'+str(geom))
         node, E2N, bdy = readMesh('../../grid/'+meshFile+'_'+str(geom))
         E2N = [E2N, np.zeros((1,3))]
         qlist = np.array([])
@@ -90,19 +89,28 @@ if __name__ == '__main__':
     maxiter = 1e6
     t = time.time()
     if args.task == 'run':
+        print('        |-------------------------------------------------|')
+        print('        |        Running DG Solver on mesh',args.mesh,'         |')
+        print('        |        p = ',p,'                                  |')
+        print('        |        q = ',geom,'                                  |')
+        print('        |-------------------------------------------------|\n')
         q,resids,resnorm = dg(q,p,geom,node,qlist,E2N[0],E2N[1],I2E,B2E,In,Bn,rBC,GAMMA,GAS_CONSTANT,CFL,convtol,miniter,maxiter)
+        t2 = time.time() - t
     else:
         d = readSolution(restartFile)
         q = d['q']
+        resids = d['resids']
+        resnorm = d['resnorm']
+        t2 = d['time']
     cl,cd,Es = integrate(q,p,geom,node,qlist,E2N[0],E2N[1],B2E,Bn,rBC,GAMMA,GAS_CONSTANT)
     print(cl,cd,Es)
-
-    qlist -= 1
-    E2N[0] -= 1
-    E2N[1] -= 1
-    B2E[:,0:2] -= 1
-    plotMach(q,node,qlist,E2N[0],E2N[1],GAMMA,p,geom,4)
-    # if args.task == 'run':
-    #     writeSolution(saveFile,q,p,geom,resids,resnorm,time.time()-t,cl,cd,Es,cp,mach)
-    plotCp(q,node,qlist,E2N[0],E2N[1],B2E,rBC,GAMMA,p,geom,12)
-    plt.show()
+    if args.task == 'run':
+        writeSolution(saveFile,q=q,p=p,geom=geom,resids=resids,resnorm=resnorm,time=t2,cl=cl,cd=cd,Es=Es)
+    else:
+        qlist -= 1
+        E2N[0] -= 1
+        E2N[1] -= 1
+        B2E[:,0:2] -= 1
+        plotMach(q,node,qlist,E2N[0],E2N[1],GAMMA,p,geom,4)
+        plotCp(q,node,qlist,E2N[0],E2N[1],B2E,rBC,GAMMA,p,geom,12)
+        plt.show()

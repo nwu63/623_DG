@@ -1,7 +1,4 @@
 ! TODO: add fail flag
-! TODO: add applyMatRes subroutine
-! TODO: check iteration counting in print out
-! TODO: try dgemm instead of matmul
 subroutine timeIntegration(q,p,I2E,B2E,In,Bn,qnrm,Jinv,Jinv2,detJ,detJ2,Minv,w,phi,gphi,w1,rBC,resids,&
     phiL,phiR,qlist,resnorm,gamma,Rgas,CFL,convtol,min_iter,max_iter,nelem,niface,nbface,nqelem,Ng,Ng1)
     ! -----------------------------------------------------------------------
@@ -120,5 +117,4 @@ subroutine applyMatRes(Minv,resids,new_resids,p)
     integer :: Nb
     Nb = (p+1)*(p+2)/2
     call dgemm('N','N',Nb,4,Nb,1.d0,Minv,Nb,resids,Nb,0.d0,new_resids,Nb)
-    ! new_resids = matmul(Minv,resids)
 end subroutine applyMatRes

@@ -1,4 +1,3 @@
-! TODO: have precomputation/evaluation of quadratures in DG
 subroutine getResidual(q,p,I2E,B2E,In,Bn,qnrm,rBC,resids,Jinv,Jinv2,detJ,detJ2,w2,phi,gphi,&
     w1,phiL,phiR,qlist,wavespeed,gamma,Rgas,nelem,niface,nbface,nqelem,Ng,Ng1)
     ! -----------------------------------------------------------------------
@@ -46,6 +45,7 @@ subroutine getResidual(q,p,I2E,B2E,In,Bn,qnrm,rBC,resids,Jinv,Jinv2,detJ,detJ2,w
     integer :: iface, elemL,elemR,faceL,faceR,elem,btype,face,Nb,ig,ib,idx
     real(8), dimension(2) :: nrm
     real(8), dimension(4) :: F,qBC,qI
+    real(8), dimension(4,2) :: F2
     real(8) :: length,pinf,Mb,rhoinf,Tt,pt,alpha,Tb,pb,cb,Splus,Jplus,uI,vI,unb,unplus,cplus,pplus,ub,vb,dn,a,b,c,det,smax
     logical :: dirichlet ! sets all BC to Dirichlet equal to qBC
     logical :: qelem     ! if the current element is high-q or low-q
@@ -74,17 +74,17 @@ subroutine getResidual(q,p,I2E,B2E,In,Bn,qnrm,rBC,resids,Jinv,Jinv2,detJ,detJ2,w
             qelem = .false.
         endif
         do ig = 1,Ng
+            call eulerFluxVec(qState(ig,:),F2,gamma)
             if (qelem) then ! curved element
                 vec = matmul(gphi(ig,:,:),Jinv2(idx,ig,:,:))             
             else
                 vec = matmul(gphi(ig,:,:),Jinv(elem,:,:))
             endif
             do ib = 1,Nb
-                call eulerFlux(qState(ig,:),F,vec(ib,:),gamma,smax) ! TODO: we actually only need to get F as 4x2 once
                 if (qelem) then ! curved element
-                    resids(elem,ib,:) = resids(elem,ib,:) - norm2(vec(ib,:))*F(:)*detJ2(idx,ig)*w2(ig)
+                    resids(elem,ib,:) = resids(elem,ib,:) - matmul(F2,vec(ib,:))*detJ2(idx,ig)*w2(ig)
                 else
-                    resids(elem,ib,:) = resids(elem,ib,:) - norm2(vec(ib,:))*F(:)*detJ(elem)*w2(ig)
+                    resids(elem,ib,:) = resids(elem,ib,:) - matmul(F2,vec(ib,:))*detJ(elem)*w2(ig)
                 endif
             enddo
         enddo
@@ -195,7 +195,7 @@ subroutine getResidual(q,p,I2E,B2E,In,Bn,qnrm,rBC,resids,Jinv,Jinv2,detJ,detJ2,w
             end if
         
             do ib = 1,Nb
-                resids(elem,ib,:) = resids(elem,ib,:) + phiL(face,ig,ib)*F(:)*length*w1(ig)
+                resids(elem,ib,:) = resids(elem,ib,:) + phiL(face,ig,ib)*F(:)*length*w1(ig) ! TODO vectorize
             enddo ! ib
             wavespeed(elem) = wavespeed(elem) + smax*length*w1(ig)
         enddo ! ig

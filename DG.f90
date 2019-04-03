@@ -1,4 +1,3 @@
-! TODO: update detJ for area with nonlinear elements
 subroutine DG(q,p,geom,resids,maxres,nodes,qlist,E2N1,E2N2,I2E,B2E,In,Bn,rBC,gamma,Rgas,CFL,convtol,min_iter,&
     max_iter,nnodes,nelem,niface,nbface,nqelem)
     implicit none

@@ -81,11 +81,10 @@ def readMeshMatrices(fname):
     Area = np.array([[float(s) for s in f.readline().split()] for n in range(nA)])
 
     f.close()
-
     return I2E, B2E, In, Bn, Area
 
-def writeSolution(filename,q,p,geom,resids,resnorm,time,cl,cd,Es,cp,mach):
-    np.savez(filename,q=q,p=p,geom=geom,resids=resids,resnorm=resnorm,time=time,cl=cl,cd=cd,Es=Es,cp=cp,mach=mach)
+def writeSolution(filename,**kwargs):
+    np.savez(filename,**kwargs)
 
 
 def readSolution(filename):
