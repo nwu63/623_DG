@@ -19,11 +19,10 @@ subroutine eulerFluxVec(q,F,gamma)
 !f2py intent(out) F
     real(8) :: velnorm,p,H
 
-
     velnorm = sqrt((q(1)/q(0))**2.d0 + (q(2)/q(0))**2.d0) ! this is the norm of velocity vector
     p = (gamma-1)*(q(3) - 0.5d0*q(0)*velnorm**2.d0)
     H = q(3)/q(0) + p/q(0)
-    ! ---------- F1 and F2 are the fluxes in the x and y directions
+    ! ---------- construct the entire flux vector
     F(0,0) = q(1)
     F(1,0) = q(1)**2.d0/q(0) + p
     F(2,0) = q(1)*q(2)/q(0)

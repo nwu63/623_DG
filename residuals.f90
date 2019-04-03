@@ -49,7 +49,7 @@ subroutine getResidual(q,p,I2E,B2E,In,Bn,qnrm,rBC,resids,Jinv,Jinv2,detJ,detJ2,w
     real(8) :: length,pinf,Mb,rhoinf,Tt,pt,alpha,Tb,pb,cb,Splus,Jplus,uI,vI,unb,unplus,cplus,pplus,ub,vb,dn,a,b,c,det,smax
     logical :: dirichlet ! sets all BC to Dirichlet equal to qBC
     logical :: qelem     ! if the current element is high-q or low-q
-    real(8), dimension(:,:), allocatable :: vec, qState, qL, qR
+    real(8), dimension(:,:), allocatable :: vec, qState, qL, qR,qState2
     
     dirichlet = .false.
     qelem = .false.
@@ -64,7 +64,9 @@ subroutine getResidual(q,p,I2E,B2E,In,Bn,qnrm,rBC,resids,Jinv,Jinv2,detJ,detJ2,w
     allocate(qL(Ng1,4))
     allocate(qR(Ng1,4))
     idx = 0
-    ! ------------------- interior element contribution
+    ! -----------------------------------
+    ! interior element contribution
+    ! -----------------------------------
     do elem = 1,nelem
         call getQ(q(elem,:,:),p,phi,Ng,qState)
         if (any(qlist == elem)) then ! curved element
@@ -80,7 +82,7 @@ subroutine getResidual(q,p,I2E,B2E,In,Bn,qnrm,rBC,resids,Jinv,Jinv2,detJ,detJ2,w
             else
                 vec = matmul(gphi(ig,:,:),Jinv(elem,:,:))
             endif
-            do ib = 1,Nb
+            do ib = 1,Nb ! TODO: vectorize
                 if (qelem) then ! curved element
                     resids(elem,ib,:) = resids(elem,ib,:) - matmul(F2,vec(ib,:))*detJ2(idx,ig)*w2(ig)
                 else
@@ -90,7 +92,9 @@ subroutine getResidual(q,p,I2E,B2E,In,Bn,qnrm,rBC,resids,Jinv,Jinv2,detJ,detJ2,w
         enddo
     enddo
 
-    ! ------------------- interior edge flux contribution
+    ! ---------------------------------- 
+    ! interior edge flux contribution
+    ! ---------------------------------- 
     do iface = 1, niface
         nrm = In(iface,1:2)
         length = In(iface,3)
@@ -102,7 +106,7 @@ subroutine getResidual(q,p,I2E,B2E,In,Bn,qnrm,rBC,resids,Jinv,Jinv2,detJ,detJ2,w
         call getQ(q(elemR,:,:),p,phiR(faceR,:,:),Ng1,qR) 
         do ig = 1,Ng1
             call roeFlux(qL(ig,:),qR(ig,:),F,nrm,gamma,smax)
-            do ib = 1,Nb
+            do ib = 1,Nb ! TODO: vectorize
                 resids(elemL,ib,:) = resids(elemL,ib,:) + phiL(faceL,ig,ib)*F(:)*length*w1(ig)
                 resids(elemR,ib,:) = resids(elemR,ib,:) - phiR(faceR,ig,ib)*F(:)*length*w1(Ng1-ig+1) ! apply weights in reverse
             enddo
@@ -110,13 +114,18 @@ subroutine getResidual(q,p,I2E,B2E,In,Bn,qnrm,rBC,resids,Jinv,Jinv2,detJ,detJ2,w
             wavespeed(elemR) = wavespeed(elemR) + smax*length * w1(Ng1-ig+1)
         enddo
     enddo
-    ! -------------------- unpack rBC
+    ! ----------------------------------
+    ! unpack rBC
+    ! ---------------------------------- 
     pinf = rBC(1)
     rhoinf = rBC(2)
     Tt = rBC(3)
     pt = rBC(4)
     alpha = rBC(5)
-    ! -------------------- boundary faces
+    ! ----------------------------------
+    ! boundary faces
+    ! ---------------------------------- 
+    allocate(qState2(Ng1,4))
     do iface = 1, nbface
         nrm = Bn(iface,1:2)
         length = Bn(iface,3)
@@ -129,13 +138,13 @@ subroutine getResidual(q,p,I2E,B2E,In,Bn,qnrm,rBC,resids,Jinv,Jinv2,detJ,detJ2,w
         else
             qelem = .false.
         endif
-
+        call getQ(q(elem,:,:),p,phiL(face,:,:),Ng1,qState2)
         do ig = 1,Ng1
             if (qelem) then
                 length = norm2(qnrm(idx,ig,:))
                 nrm = qnrm(idx,ig,:)/length
             endif
-            call getQ(q(elem,:,:),p,phiL(face,ig,:),1,qI) ! TODO: evaluate all at once
+            qI = qState2(ig,:)
             uI = qI(2)/qI(1) ! internal velocity components
             vI = qI(3)/qI(1)
             unplus = uI*nrm(1) + vI*nrm(2) ! internal projected velocity
@@ -223,7 +232,6 @@ subroutine getQ(q,p,phi,n_xy,qState)
     real(8), intent(out), dimension(n_xy,4) :: qState
 !f2py intent(in) p,q
 !f2py intent(out) qState
-    
     qState = matmul(phi,q)
 end subroutine getQ
 

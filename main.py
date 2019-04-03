@@ -83,9 +83,26 @@ if __name__ == '__main__':
 
     rBC = getBC()
     q = initSolution(p,restart=False)
-    CFL = 1/(1+p)
+    CFL_dict = {
+        'bump0' : {
+            '0' : 1.32,
+            '1' : 0.66,
+            '2' : 0.44,
+        },
+        'bump1' : {
+            '0' : 1.21,
+            '1' : 0.60,
+            '2' : 0.40,
+        },
+        'bump2' : {
+            '0' : 1.15,
+            '1' : 0.57,
+            '2' : 0.39,
+        },
+    }
+    CFL = CFL_dict[args.mesh][str(args.p)]
     convtol = 1e-7
-    miniter = 1e3
+    miniter = 1e2
     maxiter = 1e6
     t = time.time()
     if args.task == 'run':

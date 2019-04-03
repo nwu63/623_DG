@@ -1,4 +1,3 @@
-! TODO: make this work for curved elements too
 subroutine integrate(q,p,geom,nodes,qlist,E2N1,E2N2,B2E,Bn,rBC,cl,cd,Es,gamma,Rgas,nelem,nnodes,nqelem,nbface)
     ! -----------------------------------------------------------------------
     ! Purpose: Calculates the integrated values: cl, cd, Es.
@@ -109,7 +108,7 @@ subroutine integrate(q,p,geom,nodes,qlist,E2N1,E2N2,B2E,Bn,rBC,cl,cd,Es,gamma,Rg
             call getdXidSigma(face,vec)
             do ig = 1,Ng1
                 call getHOJacobian(nodes(E2N2(idx,:),:), geom, xyL(face,ig,:), Jedge, Jinv(1,:,:), Jinv(1,:,:),1)
-                tangent = Jedge(:,1)*vec(1) + Jedge(:,2)*vec(2) ! TODO vectorize
+                tangent = Jedge(:,1)*vec(1) + Jedge(:,2)*vec(2)
                 qnrm(idx,ig,1) = tangent(2)
                 qnrm(idx,ig,2) = -tangent(1)
             enddo

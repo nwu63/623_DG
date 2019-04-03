@@ -49,7 +49,7 @@ subroutine basis2D(xy, p, phi, n_xy)
     integer :: s, r, k, j, i_xy
     real(8), dimension((p+1)*(p+2)/2,(p+1)*(p+2)/2) :: C
     
-    call triLagrange2D(p,C) ! TODO precompute these, one for C_p and one for C_geom
+    call triLagrange2D(p,C)
     phi(:,:) = 0.d0
     do j = 1,(p+1)*(p+2)/2
         do s = 0, p
