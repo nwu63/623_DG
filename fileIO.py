@@ -45,7 +45,7 @@ def readCurvedMesh(fname):
         Ei = np.array([[int(s) for s in f.readline().split()] for n in range(ne)])
         E2N.append(Ei)
     q = f.readline().split();nq = int(q[0])
-    qlist = np.zeros(nq)
+    qlist = np.zeros(nq,dtype=int)
     for i in range(nq):
         s = f.readline()
         qlist[i] = int(s)

@@ -1,26 +1,58 @@
 import matplotlib.pyplot as plt
-from matplotlib.tri import Triangulation 
+from matplotlib.tri import Triangulation,UniformTriRefiner
 from fileIO import readSolution
 import numpy as np
+from dg_solver import getx,getm
 from matplotlib import rc
-rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
+import sys
+# rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
 rc('text', usetex=True)
 figsize = (6,3)
-def plotSolution(node,E2N,val):
+def plotSolution(q,node,qlist,E2N,E2N2,gamma,p,geom,level):
     fig = plt.figure(figsize=figsize)
-    triang = Triangulation(node[:,0], node[:,1], triangles=E2N)
-    # elems = [32,48]
-    # nodes = node[E2N[elems,:].flatten()]
-    # plt.plot(nodes[:,0],nodes[:,1],'.k')
-    # plt.triplot(triang,'-k')
-    cb = plt.tripcolor(triang, val)
-    fig.colorbar(cb)
+    std_tri = refineTriangle(level)
+    
+    nelem = E2N.shape[0]
+    xieta = np.stack([std_tri.x,std_tri.y],axis=1)
+    n_xieta = xieta.shape[0]
+    # xy = np.zeros((nelem,n_xieta,2))
+    xy = []
+    mach = []
+    # mach = np.zeros((nelem,n_xieta))
+    new_E2N = []
+    for ielem in range(nelem):
+        if np.any(qlist==ielem):
+            idx = np.squeeze(np.argwhere(qlist == ielem))
+            xy_elem = getx(node[E2N2[idx,:],:],geom,xieta)
+        else:
+            xy_elem = getx(node[E2N[ielem,:],:],1,xieta)
+        xy.append(xy_elem)
+        new_E2N.append(std_tri.triangles+n_xieta*ielem)
+        mach.append(getm(q[ielem,:,:],p,xieta,gamma))
+    xy = np.vstack(xy)
+    mach = np.hstack(mach)
+    new_E2N = np.vstack(new_E2N)
+    triang = Triangulation(xy[:,0], xy[:,1], triangles=new_E2N)
+    n_levels = 20
+    plt.tricontourf(triang,mach,100)
+    plt.tricontour(triang,mach,10,colors='k')
+    # plt.triplot(triang, lw=0.5, color='white')
+
     plt.axis('equal')
     plt.title('Mach Number')
     plt.xlim(-1.5,1.5)
     plt.ylim(0,0.8)
     # plt.tight_layout()
-    # plt.savefig('../plots/mach_bump2_2.pdf')
+    # plt.savefig('modern_art.pdf')
+
+def refineTriangle(level):
+    x = np.array([0,1,0])
+    y = np.array([0,0,1])
+    E2N = np.array([[0,1,2]])
+    triang = Triangulation(x,y, triangles=E2N)
+    refiner = UniformTriRefiner(triang)
+    triang2 = refiner.refine_triangulation(subdiv=level)
+    return triang2
 
 def plotCp(node,E2N,B2E,cp):
     plt.figure(figsize=figsize)
@@ -120,7 +152,7 @@ def plotResidual():
 
 
 if __name__ == '__main__':
-    plotConvergence()
+    # plotConvergence()
     # plotResidual()
-    plt.show()
-    
+    # plt.show()
+    refineTriangle(1)

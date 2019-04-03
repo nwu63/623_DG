@@ -13,6 +13,19 @@ subroutine getJacobian(nodes, J, Jinv, detJ)
     call matInv(2,J,Jinv)
 end subroutine getJacobian
 
+subroutine getX(nodes,geom,xy,phys,n_xy)
+    implicit none
+    integer, intent(in) :: geom,n_xy
+    real(8), intent(in), dimension((geom+1)*(geom+2)/2,2) :: nodes
+    real(8), intent(in), dimension(n_xy,2) :: xy
+    real(8), intent(out), dimension(n_xy,2) :: phys
+!f2py intent(in) nodes,xy
+!f2py intent(out) phys
+    real(8), dimension(n_xy,(geom+1)*(geom+2)/2) :: phi
+
+    call basis2D(xy, geom, phi, n_xy)
+    phys = matmul(phi,nodes)
+end subroutine getX
 
 subroutine getHOJacobian(nodes, geom, xy, J, Jinv, detJ, n_xy)
     implicit none

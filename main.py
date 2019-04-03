@@ -1,5 +1,5 @@
 from __future__ import division
-from dg_solver import dg, getjacobian,basis2d,getrefmassmatrix,roeflux,eulerflux,basis2d,gbasis2d,integrate,getmassinv
+from dg_solver import dg,roeflux,eulerflux,basis2d,gauss2d_pre,integrate
 import numpy as np
 import matplotlib.pyplot as plt
 from fileIO import readMesh, readCurvedMesh, readMeshMatrices, writeSolution, readSolution
@@ -57,7 +57,7 @@ if __name__ == '__main__':
     meshFile = args.mesh
     p = args.p
     if args.q == -1:
-        if args.p == 2:
+        if args.p >= 2:
             geom = 2
         else:
             geom = args.p + 1
@@ -94,13 +94,15 @@ if __name__ == '__main__':
     else:
         d = readSolution(restartFile)
         q = d['q']
-    cl,cd,Es,cp,mach = integrate(q,p,geom,node,qlist,E2N[0],E2N[1],B2E,Bn,rBC,GAMMA,GAS_CONSTANT)
-    if args.task == 'run':
-        writeSolution(saveFile,q,p,geom,resids,resnorm,time.time()-t,cl,cd,Es,cp,mach)
+    cl,cd,Es,cp = integrate(q,p,geom,node,qlist,E2N[0],E2N[1],B2E,Bn,rBC,GAMMA,GAS_CONSTANT)
     print(cl,cd,Es)
 
+    qlist -= 1
     E2N[0] -= 1
+    E2N[1] -= 1
     B2E[0:1] -= 1
-    plotSolution(node,E2N[0],mach)
-    plotCp(node,E2N[0],B2E,cp)
+    plotSolution(q,node,qlist,E2N[0],E2N[1],GAMMA,p,geom,2)
+    # if args.task == 'run':
+    #     writeSolution(saveFile,q,p,geom,resids,resnorm,time.time()-t,cl,cd,Es,cp,mach)
+    # plotCp(node,qlist,E2N[0],E2N[1],B2E,cp)
     plt.show()
