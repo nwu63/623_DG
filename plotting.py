@@ -64,6 +64,7 @@ def plotCp(q,node,qlist,E2N,E2N2,B2E,rBC,gamma,p,geom,level):
 
     cp = []
     xy = []
+    centroid_pos = []
     for iface in range(nbface):
         ielem = B2E[iface,0]
         face = B2E[iface,1]
@@ -77,13 +78,17 @@ def plotCp(q,node,qlist,E2N,E2N2,B2E,rBC,gamma,p,geom,level):
                 xy_elem = getx(node[E2N[ielem,:],:],1,xieta)
             xy.append(xy_elem)
             cp.append(getcp(q[ielem,:,:],p,rBC,xieta,gamma))
-    cp = np.hstack(cp)
-    xy = np.vstack(xy)
-    cp = np.stack((xy[:,0],cp),axis=1)
-    print(cp.shape)
-    cp = cp[cp[:,0].argsort()]
+            centroid_pos.append(np.mean(xy_elem))
+    cp = [x for _, x in sorted(zip(centroid_pos,cp))]
+    xy = [x for _, x in sorted(zip(centroid_pos,xy))]
+    new_cp = []
+    for elem in range(len(cp)):
+        elem_cp = np.stack((xy[elem][:,0],cp[elem]),axis=1)
+        elem_cp = elem_cp[elem_cp[:,0].argsort()]
+        new_cp.append(elem_cp)
+    new_cp = np.vstack(new_cp)
     plt.figure(figsize=figsize)
-    plt.plot(cp[:,0],cp[:,1])
+    plt.plot(new_cp[:,0],new_cp[:,1])
     plt.gca().invert_yaxis()
     plt.xlabel('$x$')
     plt.ylabel('$c_p$')
