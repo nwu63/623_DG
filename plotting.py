@@ -2,23 +2,20 @@ import matplotlib.pyplot as plt
 from matplotlib.tri import Triangulation,UniformTriRefiner
 from fileIO import readSolution
 import numpy as np
-from dg_solver import getx,getm
+from dg_solver import getx,getm,getcp
 from matplotlib import rc
 import sys
 # rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
 rc('text', usetex=True)
 figsize = (6,3)
-def plotSolution(q,node,qlist,E2N,E2N2,gamma,p,geom,level):
+def plotMach(q,node,qlist,E2N,E2N2,gamma,p,geom,level):
     fig = plt.figure(figsize=figsize)
     std_tri = refineTriangle(level)
-    
     nelem = E2N.shape[0]
     xieta = np.stack([std_tri.x,std_tri.y],axis=1)
     n_xieta = xieta.shape[0]
-    # xy = np.zeros((nelem,n_xieta,2))
     xy = []
     mach = []
-    # mach = np.zeros((nelem,n_xieta))
     new_E2N = []
     for ielem in range(nelem):
         if np.any(qlist==ielem):
@@ -54,24 +51,38 @@ def refineTriangle(level):
     triang2 = refiner.refine_triangulation(subdiv=level)
     return triang2
 
-def plotCp(node,E2N,B2E,cp):
-    plt.figure(figsize=figsize)
-    cp = np.squeeze(cp[np.where(cp[:,0]>0),:])
-    elem = cp[:,0].astype(int)
-    x = np.zeros_like(elem,dtype=float)
+def plotCp(q,node,qlist,E2N,E2N2,B2E,rBC,gamma,p,geom,level):
     nbface = B2E.shape[0]
+    xyL = np.zeros((3,level,2))
+    x = np.linspace(0,1,level)
+    xyL[0,:,0] = 1-x
+    xyL[0,:,1] = x
+    xyL[1,:,0] = 0
+    xyL[1,:,1] = 1-x
+    xyL[2,:,0] = x
+    xyL[2,:,1] = 0
+
+    cp = []
+    xy = []
     for iface in range(nbface):
         ielem = B2E[iface,0]
         face = B2E[iface,1]
         btype = B2E[iface,2]
         if btype == 4:
-            idx = np.squeeze(np.argwhere(elem == ielem))
-            n1 = (face-1)%3
-            n2 = (face-2)%3
-            xvals = node[E2N[elem[idx],[n1,n2]],0]
-            x[idx] = np.mean(xvals)
-    cp[:,0] = x
+            xieta = xyL[face,:,:]
+            if np.any(qlist==ielem):
+                idx = np.squeeze(np.argwhere(qlist == ielem))
+                xy_elem = getx(node[E2N2[idx,:],:],geom,xieta)
+            else:
+                xy_elem = getx(node[E2N[ielem,:],:],1,xieta)
+            xy.append(xy_elem)
+            cp.append(getcp(q[ielem,:,:],p,rBC,xieta,gamma))
+    cp = np.hstack(cp)
+    xy = np.vstack(xy)
+    cp = np.stack((xy[:,0],cp),axis=1)
+    print(cp.shape)
     cp = cp[cp[:,0].argsort()]
+    plt.figure(figsize=figsize)
     plt.plot(cp[:,0],cp[:,1])
     plt.gca().invert_yaxis()
     plt.xlabel('$x$')

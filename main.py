@@ -6,7 +6,7 @@ from fileIO import readMesh, readCurvedMesh, readMeshMatrices, writeSolution, re
 from processMesh import signedArea, curveMesh
 from constants import GAS_CONSTANT, GAMMA, getIC, getBC
 import argparse
-from plotting import plotSolution, plotCp
+from plotting import plotMach, plotCp
 import time
 
 
@@ -94,15 +94,15 @@ if __name__ == '__main__':
     else:
         d = readSolution(restartFile)
         q = d['q']
-    cl,cd,Es,cp = integrate(q,p,geom,node,qlist,E2N[0],E2N[1],B2E,Bn,rBC,GAMMA,GAS_CONSTANT)
+    cl,cd,Es = integrate(q,p,geom,node,qlist,E2N[0],E2N[1],B2E,Bn,rBC,GAMMA,GAS_CONSTANT)
     print(cl,cd,Es)
 
     qlist -= 1
     E2N[0] -= 1
     E2N[1] -= 1
-    B2E[0:1] -= 1
-    plotSolution(q,node,qlist,E2N[0],E2N[1],GAMMA,p,geom,2)
+    B2E[:,0:2] -= 1
+    plotMach(q,node,qlist,E2N[0],E2N[1],GAMMA,p,geom,4)
     # if args.task == 'run':
     #     writeSolution(saveFile,q,p,geom,resids,resnorm,time.time()-t,cl,cd,Es,cp,mach)
-    # plotCp(node,qlist,E2N[0],E2N[1],B2E,cp)
+    plotCp(q,node,qlist,E2N[0],E2N[1],B2E,rBC,GAMMA,p,geom,12)
     plt.show()

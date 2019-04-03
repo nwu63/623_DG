@@ -1,9 +1,7 @@
 ! TODO: make this work for curved elements too
-subroutine integrate(q,p,geom,nodes,qlist,E2N1,E2N2,B2E,Bn,rBC,cl,cd,Es,cp,gamma,Rgas,nelem,nnodes,nqelem,nbface)
+subroutine integrate(q,p,geom,nodes,qlist,E2N1,E2N2,B2E,Bn,rBC,cl,cd,Es,gamma,Rgas,nelem,nnodes,nqelem,nbface)
     ! -----------------------------------------------------------------------
     ! Purpose: Calculates the integrated values: cl, cd, Es.
-    !          Also calculates mach number for each elem, and
-    !          cp for the bottom face
     ! 
     ! Inputs:
     !   q[nelem,4] = the initial state
@@ -16,9 +14,6 @@ subroutine integrate(q,p,geom,nodes,qlist,E2N1,E2N2,B2E,Bn,rBC,cl,cd,Es,cp,gamma
     ! 
     ! Outs:
     !   cl, cd, Es
-    !   cp[nelem,2] we don't know how many elements on the bottom, so we initialize
-    !               for the whole vector. First entry is elem number, second the cp
-    !   mach[nelem]
     ! 
     ! -----------------------------------------------------------------------
     implicit none
@@ -33,16 +28,15 @@ subroutine integrate(q,p,geom,nodes,qlist,E2N1,E2N2,B2E,Bn,rBC,cl,cd,Es,cp,gamma
     real(8), intent(in), dimension(5) :: rBC
     real(8), intent(in) :: gamma, Rgas
     real(8), intent(out) :: cl,cd,Es
-    real(8), intent(out), dimension(nelem,2) :: cp
 !f2py intent(in) q,p,B2E,Bn,rBC,nodes,qlist,E2N1,E2N2
 !f2py intent(out) cl,cd,Es,cp
     integer :: iface,btype,elem,idx,face,Nb,ig,ielem,idx2,g,g1,Ng,Ng1
     real(8), dimension(4) :: qState
     real(8), dimension(2) :: nrm,vec,tangent
     real(8), dimension(2,2) :: Jedge
-    real(8) :: uI,vI,ub,vb,length,pb,pinf,rhoinf,Tt,pt,Minf,h,rhot,st,s,c,pdyn
+    real(8) :: uI,vI,ub,vb,length,pb,pinf,rhoinf,Tt,pt,Minf,h,rhot,st,s,pdyn
     real(8), dimension(:,:,:), allocatable :: xyL, phiL,J,Jinv,qnrm ! xyL is the edge integration points on T
-    real(8), dimension(:,:), allocatable :: xy, qB, qI,detJ2
+    real(8), dimension(:,:), allocatable :: xy, qB, qI,detJ2,phi
     real(8), dimension(:), allocatable :: w1,w,x
     real(8), dimension(nelem) :: detJ
     logical :: qelem
@@ -56,7 +50,6 @@ subroutine integrate(q,p,geom,nodes,qlist,E2N1,E2N2,B2E,Bn,rBC,cl,cd,Es,cp,gamma
     cl = 0
     cd = 0
     idx = 1
-    cp(:,:) = -1
 
     ! -----------------------------------
     ! 2D integration
@@ -66,7 +59,9 @@ subroutine integrate(q,p,geom,nodes,qlist,E2N1,E2N2,B2E,Bn,rBC,cl,cd,Es,cp,gamma
     call Gauss2D_pre(g,Ng)
     allocate(xy(Ng,2))
     allocate(w(Ng))
+    allocate(phi(Ng,Nb))
     call Gauss2D(g,Ng,xy,w)
+    call basis2D(xy, p, phi, Ng)
     allocate(J(Ng,2,2))
     allocate(Jinv(Ng,2,2))
     allocate(detJ2(nqelem,Ng))
@@ -152,14 +147,10 @@ subroutine integrate(q,p,geom,nodes,qlist,E2N1,E2N2,B2E,Bn,rBC,cl,cd,Es,cp,gamma
                 cl = cl + (pb-pinf)*nrm(2)*length*w1(ig)
                 cd = cd + (pb-pinf)*nrm(1)*length*w1(ig)
             enddo
-            cp(idx2,1) = elem
-            cp(idx2,2) = pb-pinf
-            idx2 = idx2 + 1
         endif
     enddo
     cl = cl/pdyn/h
     cd = cd/pdyn/h
-    cp(:,2) = cp(:,2)/pdyn
 
     ! -----------------------------------
     ! Area integration
@@ -169,7 +160,7 @@ subroutine integrate(q,p,geom,nodes,qlist,E2N1,E2N2,B2E,Bn,rBC,cl,cd,Es,cp,gamma
     st = pt/rhot**gamma
     Es = 0.d0
     do elem = 1, nelem
-        call getQ(q(elem,:,:),p,xy,Ng,qI)
+        call getQ(q(elem,:,:),p,phi,Ng,qI)
         if (any(qlist == elem)) then ! curved element
             qelem = .true.
             idx = minloc((qlist-elem)**2,dim=1)
@@ -231,3 +222,48 @@ subroutine getM(q,p,mach,xy,n_xy,gamma)
         mach(ig) = sqrt(uI**2 + vI**2)/c
     enddo
 end subroutine getM
+
+subroutine getCp(q,p,cp,rBC,xy,n_xy,gamma)
+    ! -----------------------------------------------------------------------
+    ! Purpose: Evaluates the state qState, given by the coefficients
+    !          q on a triangular element with Lagrange basis functions
+    ! 
+    ! Inputs:
+    !   q[Nb,4] = basis coefficients for each state rank
+    !   p = order of the polynomial. Naturally Nb = (p+1)*(p+2)/2
+    !   xy [n_xy,2] = xi and eta locations for each point to be evaluated
+    ! 
+    ! Outs:
+    !   qState[n_xy,4] = the state for each point
+    ! 
+    ! -----------------------------------------------------------------------
+    implicit none
+    real(8), intent(in) :: gamma
+    integer, intent(in) :: p,n_xy
+    real(8), intent(in), dimension(5) :: rBC
+    real(8), intent(in), dimension(n_xy,2) :: xy
+    real(8), intent(in), dimension((p+1)*(p+2)/2,4) :: q
+    real(8), intent(out),dimension(n_xy) :: cp
+!f2py intent(in) p,q,xy
+!f2py intent(out) mach
+    real(8), dimension(n_xy,(p+1)*(p+2)/2) :: phi
+    integer :: ig
+    real(8) :: uI,vI,pb,pdyn,pinf,Tt,Minf
+    real(8), dimension(n_xy,4) :: qelem
+    real(8), dimension(4) :: qState
+    
+    pinf = rBC(1)
+    Tt = rBC(3)
+    Minf = sqrt((Tt - 1)*2/(gamma-1))
+    pdyn = gamma/2.d0*pinf*Minf**2
+    call basis2D(xy, p, phi, n_xy)
+    call getQ(q,p,phi,n_xy,qelem)
+    do ig = 1,n_xy
+        qState = qelem(ig,:)
+        uI = qState(2)/qState(1)
+        vI = qState(3)/qState(1)
+        pb = (gamma-1.d0)*(qState(4) - 0.5d0*qState(1)*(uI**2+vI**2))
+        cp(ig) = pb-pinf
+    enddo
+    cp = cp/pdyn
+end subroutine getCp
