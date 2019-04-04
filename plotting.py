@@ -155,20 +155,17 @@ def plotConvergence():
     # plt.tight_layout()
     # plt.savefig('../plots/Es.pdf')
 
-def plotResidual():
-    saveFile = '../solution/bump0_2_sol'
-    sol = readSolution(saveFile)
+def plotResidual(resnorm):
+    resnorm = resnorm[np.argwhere(resnorm > 0)]
     plt.figure(figsize=figsize)
-    plt.semilogy(sol['resnorm'])
+    plt.semilogy(resnorm)
     plt.xlabel('Iterations')
     plt.ylabel('Residual Norm')
     # plt.tight_layout()
     # plt.savefig('../plots/resnorm_2.pdf')
 
 
-
 if __name__ == '__main__':
-    # plotConvergence()
-    # plotResidual()
+    plotConvergence()
+    plotResidual()
     # plt.show()
-    refineTriangle(1)

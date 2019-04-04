@@ -6,7 +6,7 @@ from fileIO import readMesh, readCurvedMesh, readMeshMatrices, writeSolution, re
 from processMesh import signedArea, curveMesh
 from constants import GAS_CONSTANT, GAMMA, getIC, getBC
 import argparse
-from plotting import plotMach, plotCp
+from plotting import plotMach, plotCp, plotResidual
 import time
 
 
@@ -52,7 +52,7 @@ if __name__ == '__main__':
     parser.add_argument("--p", type=int, default=0)
     parser.add_argument("--q", type=int, default=-1)
     parser.add_argument("--mesh", type=str, default='test')
-    parser.add_argument("--task", choices=['run', 'post'], default='run')
+    parser.add_argument("--task", choices=['run', 'restart', 'post'], default='run')
     args = parser.parse_args()
     meshFile = args.mesh
     p = args.p
@@ -65,7 +65,6 @@ if __name__ == '__main__':
         geom = args.q
     
     saveFile = '../solution/'+meshFile+'_'+str(args.p)+'_sol'
-    # restartFile = '../solution_0/'+meshFile+'_1_sol'
     restartFile = saveFile
 
     I2E, B2E, In, Bn, area = readMeshMatrices('../../grid/'+meshFile+'_mat')
@@ -103,31 +102,40 @@ if __name__ == '__main__':
     CFL = CFL_dict[args.mesh][str(args.p)]
     convtol = 1e-7
     miniter = 1e2
-    maxiter = 1e6
+    maxiter = 1e5
     t = time.time()
-    if args.task == 'run':
-        print('        |-------------------------------------------------|')
-        print('        |        Running DG Solver on mesh',args.mesh,'         |')
-        print('        |        p = ',p,'                                  |')
-        print('        |        q = ',geom,'                                  |')
-        print('        |-------------------------------------------------|\n')
-        q,resids,resnorm = dg(q,p,geom,node,qlist,E2N[0],E2N[1],I2E,B2E,In,Bn,rBC,GAMMA,GAS_CONSTANT,CFL,convtol,miniter,maxiter)
-        t2 = time.time() - t
-    else:
+    fail = False
+    if args.task == 'restart' or args.task == 'post':
         d = readSolution(restartFile)
         q = d['q']
         resids = d['resids']
         resnorm = d['resnorm']
         t2 = d['time']
+    if args.task == 'run' or args.task == 'restart':
+        print('        |-------------------------------------------------|')
+        print('        |        Running DG Solver on mesh',args.mesh,'         |')
+        print('        |        p = ',p,'                                  |')
+        print('        |        q = ',geom,'                                  |')
+        print('        |-------------------------------------------------|\n')
+        q,fail,resids,resnorm = dg(q,p,geom,node,qlist,E2N[0],E2N[1],I2E,B2E,In,Bn,rBC,GAMMA,GAS_CONSTANT,CFL,convtol,miniter,maxiter)
+        t2 = time.time() - t
+
+    if fail:
+        print('        |-------------------------------------------------|')
+        print('        |        Solver failed to converge                |')
+        print('        |        Try a smaller CFL number                 |')
+        print('        |-------------------------------------------------|\n')
+
     cl,cd,Es = integrate(q,p,geom,node,qlist,E2N[0],E2N[1],B2E,Bn,rBC,GAMMA,GAS_CONSTANT)
     print(cl,cd,Es)
-    if args.task == 'run':
+    if (args.task == 'run' or args.task == 'restart') and not fail:
         writeSolution(saveFile,q=q,p=p,geom=geom,resids=resids,resnorm=resnorm,time=t2,cl=cl,cd=cd,Es=Es)
-    else:
+    elif args.task == 'post':
         qlist -= 1
         E2N[0] -= 1
         E2N[1] -= 1
         B2E[:,0:2] -= 1
         plotMach(q,node,qlist,E2N[0],E2N[1],GAMMA,p,geom,4)
         plotCp(q,node,qlist,E2N[0],E2N[1],B2E,rBC,GAMMA,p,geom,12)
+        plotResidual(resnorm)
         plt.show()

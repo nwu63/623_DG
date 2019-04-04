@@ -1,4 +1,4 @@
-subroutine DG(q,p,geom,resids,maxres,nodes,qlist,E2N1,E2N2,I2E,B2E,In,Bn,rBC,gamma,Rgas,CFL,convtol,min_iter,&
+subroutine DG(q,p,fail,geom,resids,maxres,nodes,qlist,E2N1,E2N2,I2E,B2E,In,Bn,rBC,gamma,Rgas,CFL,convtol,min_iter,&
     max_iter,nnodes,nelem,niface,nbface,nqelem)
     implicit none
     integer, intent(in) :: p,nnodes,nelem,niface,nbface,min_iter,max_iter,nqelem,geom
@@ -15,6 +15,7 @@ subroutine DG(q,p,geom,resids,maxres,nodes,qlist,E2N1,E2N2,I2E,B2E,In,Bn,rBC,gam
     real(8), intent(in), dimension(5) :: rBC
     real(8), intent(in) :: gamma, Rgas, convtol, CFL
     real(8), intent(out), dimension(max_iter) :: maxres
+    logical, intent(out) :: fail
 !f2py intent(in) node,E2N1,E2N2,I2E,B2E,In,Bn,gamma,rBC,qlist
 !f2py intent(out) resids, maxres, detJ
 !f2py intent(in,out) q
@@ -117,7 +118,7 @@ subroutine DG(q,p,geom,resids,maxres,nodes,qlist,E2N1,E2N2,I2E,B2E,In,Bn,rBC,gam
     ! Timestep
     ! -----------------------------------
     
-    call timeIntegration(q,p,I2E,B2E,In,Bn,qnrm,Jinv,Jinv2,detJ,detJ2,Minv,w,phi,gphi,w1,rBC,resids,&
+    call timeIntegration(q,p,fail,I2E,B2E,In,Bn,qnrm,Jinv,Jinv2,detJ,detJ2,Minv,w,phi,gphi,w1,rBC,resids,&
     phiL,phiR,qlist,maxres,gamma,Rgas,CFL,convtol,min_iter,max_iter,nelem,niface,nbface,nqelem,Ng,Ng1)
 
     ! call getResidual(q,p,I2E,B2E,In,Bn,qnrm,rBC,resids,Jinv,Jinv2,detJ,detJ2,xy,w,gphi,w1,&

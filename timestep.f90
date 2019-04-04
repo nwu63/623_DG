@@ -1,5 +1,5 @@
 ! TODO: add fail flag
-subroutine timeIntegration(q,p,I2E,B2E,In,Bn,qnrm,Jinv,Jinv2,detJ,detJ2,Minv,w,phi,gphi,w1,rBC,resids,&
+subroutine timeIntegration(q,p,fail,I2E,B2E,In,Bn,qnrm,Jinv,Jinv2,detJ,detJ2,Minv,w,phi,gphi,w1,rBC,resids,&
     phiL,phiR,qlist,resnorm,gamma,Rgas,CFL,convtol,min_iter,max_iter,nelem,niface,nbface,nqelem,Ng,Ng1)
     ! -----------------------------------------------------------------------
     ! Purpose: use forward Euler to timestep the governing equations
@@ -44,6 +44,7 @@ subroutine timeIntegration(q,p,I2E,B2E,In,Bn,qnrm,Jinv,Jinv2,detJ,detJ2,Minv,w,p
     real(8), intent(in), dimension(5) :: rBC
     real(8), intent(in) :: gamma, Rgas, convtol, CFL
     real(8), intent(out), dimension(max_iter) :: resnorm
+    logical, intent(out) :: fail
 !f2py intent(in) node,E2N,I2E,B2E,In,Bn,gamma,rBC,Jinv,Minv
 !f2py intent(out) resids, resnorm
 !f2py intent(in,out) q
@@ -54,7 +55,7 @@ subroutine timeIntegration(q,p,I2E,B2E,In,Bn,qnrm,Jinv,Jinv2,detJ,detJ2,Minv,w,p
     real(8), dimension((p+1)*(p+2)/2,4) :: new_resids
     real(8) :: dt
     resnorm(:) = -1 ! set to high value to allow first pass of while loop
-    
+    fail = .false.
     do iter = 1,max_iter
         call getResidual(q,p,I2E,B2E,In,Bn,qnrm,rBC,resids,Jinv,Jinv2,detJ,detJ2,w,phi,gphi,w1,&
             phiL,phiR,qlist,wavespeed,gamma,Rgas,nelem,niface,nbface,nqelem,Ng,Ng1)
@@ -79,6 +80,8 @@ subroutine timeIntegration(q,p,I2E,B2E,In,Bn,qnrm,Jinv,Jinv2,detJ,detJ2,Minv,w,p
         elseif (p == 1) then
             call getResidual(q1,p,I2E,B2E,In,Bn,qnrm,rBC,resids,Jinv,Jinv2,detJ,detJ2,w,phi,gphi,w1,&
                 phiL,phiR,qlist,wavespeed,gamma,Rgas,nelem,niface,nbface,nqelem,Ng,Ng1)
+            resnorm(iter) = maxval(resids)
+            loc = maxloc(resids)
             do ielem = 1,nelem
                 call applyMatRes(Minv(ielem,:,:),resids(ielem,:,:),new_resids,p)
                 dt = CFL*detJ(ielem)/wavespeed(ielem)
@@ -94,21 +97,27 @@ subroutine timeIntegration(q,p,I2E,B2E,In,Bn,qnrm,Jinv,Jinv2,detJ,detJ2,Minv,w,p
             enddo
             call getResidual(q2,p,I2E,B2E,In,Bn,qnrm,rBC,resids,Jinv,Jinv2,detJ,detJ2,w,phi,gphi,w1,&
                 phiL,phiR,qlist,wavespeed,gamma,Rgas,nelem,niface,nbface,nqelem,Ng,Ng1)
-            
+            resnorm(iter) = maxval(resids)
+            loc = maxloc(resids)
             do ielem = 1,nelem
                 call applyMatRes(Minv(ielem,:,:),resids(ielem,:,:),new_resids,p)
                 dt = CFL*detJ(ielem)/wavespeed(ielem)
                 q(ielem,:,:) = 1.d0/3.d0*(q(ielem,:,:) + 2.d0*q2(ielem,:,:) - 2.d0*dt*new_resids)
             enddo
         endif
-        if ((iter > min_iter .and. resnorm(iter) < convtol) .or. resnorm(iter) /= resnorm(iter)) then
+        if (iter > min_iter .and. resnorm(iter) < convtol .and. resnorm(iter) == resnorm(iter))then
+            fail = .false.
+            exit
+        elseif (resnorm(iter) /= resnorm(iter)) then
+            fail = .true.
             exit
         endif
     enddo
-    print*, "Converged! Took ", iter-1, " iterations to reduce residual to ",resnorm(iter-1)
 end subroutine timeIntegration
 
 subroutine applyMatRes(Minv,resids,new_resids,p)
+    ! we use matmul instead of DGEMM because the sizes are small enough
+    ! that matmul is actually faster
     implicit none
     integer, intent(in) :: p
     real(8), intent(in), dimension((p+1)*(p+2)/2,(p+1)*(p+2)/2) :: Minv
@@ -116,5 +125,6 @@ subroutine applyMatRes(Minv,resids,new_resids,p)
     real(8), intent(out),dimension((p+1)*(p+2)/2,4) :: new_resids
     integer :: Nb
     Nb = (p+1)*(p+2)/2
-    call dgemm('N','N',Nb,4,Nb,1.d0,Minv,Nb,resids,Nb,0.d0,new_resids,Nb)
+    ! call dgemm('N','N',Nb,4,Nb,1.d0,Minv,Nb,resids,Nb,0.d0,new_resids,Nb)
+    new_resids = matmul(Minv,resids)
 end subroutine applyMatRes
