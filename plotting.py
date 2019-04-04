@@ -96,14 +96,15 @@ def plotCp(q,node,qlist,E2N,E2N2,B2E,rBC,gamma,p,geom,level):
     # plt.savefig('../plots/cp_bump2_1.pdf')
 
 def plotConvergence():
-    meshes = ['bump'+str(x) for x in range(4)]
-    orders = [1,2]
+    meshes = ['bump'+str(x) for x in range(3)]
+    orders = [x for x in range(3)]
     cl = np.zeros((len(orders),len(meshes)))
     cd = np.zeros_like(cl)
     Es = np.zeros_like(cl)
     cl_err = np.zeros((len(orders),len(meshes)))
     cd_err = np.zeros_like(cl)
     Es_err = np.zeros_like(cl)
+    time = np.zeros_like(cl)
     ndof = np.zeros(len(meshes))
     cl_exact = 1.537095
     cd_exact = 2.94278E-6
@@ -111,7 +112,7 @@ def plotConvergence():
 
     for i,order in enumerate(orders):
         for j,mesh in enumerate(meshes):
-            saveFile = '../solution_0/'+mesh+'_'+str(order)+'_sol'
+            saveFile = '../solution/'+mesh+'_'+str(order)+'_sol'
             sol = readSolution(saveFile)
             cl[i][j] = sol['cl']
             cl_err[i][j] = np.abs(sol['cl'] - cl_exact)
@@ -119,41 +120,78 @@ def plotConvergence():
             cd_err[i][j] = np.abs(sol['cd'] - cd_exact)
             Es[i][j] = sol['Es']
             Es_err[i][j] = np.abs(sol['Es'] - Es_exact)
-            ndof[j] = sol['q'].shape[0]
-
-    p_CL = np.polyfit(np.log(np.sqrt(ndof)),np.log(cl_err).T,1)
-    p_CD = np.polyfit(np.log(np.sqrt(ndof)),np.log(cd_err).T,1)
-    p_Es = np.polyfit(np.log(np.sqrt(ndof)),np.log(Es_err).T,1)
-    print(p_CL[0,:])
-    print(p_CD[0,:])
-    print(p_Es[0,:])
+            ndof[j] = np.sqrt(sol['q'].shape[0]*sol['q'].shape[1])
+            time[i][j] = sol['time']
+            
 
     plt.figure(figsize=figsize)
-    plt.plot(np.sqrt(ndof),cl_err.T,'-o')
+    plt.plot(ndof,cl_err.T,'-o')
     plt.ylabel('$c_l$')
     plt.xlabel('$\sqrt{\mathrm{dof}}$')
     plt.gca().set_xscale("log")
     plt.gca().set_yscale("log")
+    plt.legend(['p=0','p=1','p=2'])
     # plt.tight_layout()
     # plt.savefig('../plots/cl.pdf')
 
     plt.figure(figsize=figsize)
-    plt.plot(np.sqrt(ndof),cd_err.T,'-o')
+    plt.plot(ndof,cd_err.T,'-o')
     plt.ylabel('$c_d$')
     plt.gca().set_xscale("log")
     plt.xlabel('$\sqrt{\mathrm{dof}}$')
     plt.gca().set_yscale("log")
+    plt.legend(['p=0','p=1','p=2'])
     # plt.tight_layout()
     # plt.savefig('../plots/cd.pdf')
 
     plt.figure(figsize=figsize)
-    plt.plot(np.sqrt(ndof),Es_err.T,'-o')
+    plt.plot(ndof,Es_err.T,'-o')
     plt.ylabel('$E_s$')
     plt.xlabel('$\sqrt{\mathrm{dof}}$')
     plt.gca().set_xscale("log")
     plt.gca().set_yscale("log")
+    plt.legend(['p=0','p=1','p=2'])
     # plt.tight_layout()
     # plt.savefig('../plots/Es.pdf')
+
+    plt.figure(figsize=figsize)
+    plt.plot(time,cl_err,'-o')
+    plt.ylabel('$c_l$')
+    plt.xlabel('Runtime (s)')
+    plt.gca().set_xscale("log")
+    plt.gca().set_yscale("log")
+    plt.legend(['p=0','p=1','p=2'])
+    # plt.tight_layout()
+    # plt.savefig('../plots/cl.pdf')
+
+    plt.figure(figsize=figsize)
+    plt.plot(time,cd_err,'-o')
+    plt.ylabel('$c_d$')
+    plt.gca().set_xscale("log")
+    plt.xlabel('Runtime (s)')
+    plt.gca().set_yscale("log")
+    plt.legend(['p=0','p=1','p=2'])
+    # plt.tight_layout()
+    # plt.savefig('../plots/cd.pdf')
+
+    plt.figure(figsize=figsize)
+    plt.plot(time,Es_err,'-o')
+    plt.ylabel('$E_s$')
+    plt.xlabel('Runtime (s)')
+    plt.gca().set_xscale("log")
+    plt.gca().set_yscale("log")
+    plt.legend(['p=0','p=1','p=2'])
+    # plt.tight_layout()
+    # plt.savefig('../plots/Es.pdf')
+
+
+
+    p_CL = np.polyfit(np.log(ndof),np.log(cl_err).T,1,w=np.array([1,1,0]))
+    p_CD = np.polyfit(np.log(ndof),np.log(cd_err).T,1,w=np.array([1,1,0]))
+    p_Es = np.polyfit(np.log(ndof),np.log(Es_err).T,1)
+    print(p_CL[0,:])
+    print(p_CD[0,:])
+    print(p_Es[0,:])
 
 def plotResidual(resnorm):
     resnorm = resnorm[np.argwhere(resnorm > 0)]
@@ -167,5 +205,6 @@ def plotResidual(resnorm):
 
 if __name__ == '__main__':
     plotConvergence()
-    plotResidual()
+    plt.show()
+    # plotResidual()
     # plt.show()

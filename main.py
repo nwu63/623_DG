@@ -53,6 +53,7 @@ if __name__ == '__main__':
     parser.add_argument("--q", type=int, default=-1)
     parser.add_argument("--mesh", type=str, default='test')
     parser.add_argument("--task", choices=['run', 'restart', 'post'], default='run')
+    parser.add_argument('--no-save',dest='save', action='store_false')
     args = parser.parse_args()
     meshFile = args.mesh
     p = args.p
@@ -102,7 +103,7 @@ if __name__ == '__main__':
     CFL = CFL_dict[args.mesh][str(args.p)]
     convtol = 1e-7
     miniter = 1e2
-    maxiter = 1e5
+    maxiter = 1e7
     t = time.time()
     fail = False
     if args.task == 'restart' or args.task == 'post':
@@ -128,7 +129,7 @@ if __name__ == '__main__':
 
     cl,cd,Es = integrate(q,p,geom,node,qlist,E2N[0],E2N[1],B2E,Bn,rBC,GAMMA,GAS_CONSTANT)
     print(cl,cd,Es)
-    if (args.task == 'run' or args.task == 'restart') and not fail:
+    if (args.task == 'run' or args.task == 'restart') and not fail and args.save:
         writeSolution(saveFile,q=q,p=p,geom=geom,resids=resids,resnorm=resnorm,time=t2,cl=cl,cd=cd,Es=Es)
     elif args.task == 'post':
         qlist -= 1
